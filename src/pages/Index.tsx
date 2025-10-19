@@ -9,33 +9,33 @@ const Index = () => {
   const features = [
     {
       icon: BarChart3,
-      title: "Advanced Analytics",
-      description: "Comprehensive data visualization with interactive charts and real-time insights"
+      title: "Data Upload & Management",
+      description: "Upload CSV and Excel files, manage multiple datasets with ease"
     },
     {
       icon: Users,
-      title: "Student Management",
-      description: "Track and manage student information, performance, and engagement metrics"
+      title: "Data Transformation",
+      description: "Clean, filter, and transform your data with powerful built-in tools"
     },
     {
       icon: TrendingUp,
-      title: "Performance Tracking",
-      description: "Monitor academic progress with detailed performance trends and predictions"
+      title: "Visual Query Builder",
+      description: "Create complex queries visually without writing code"
     },
     {
       icon: PieChart,
-      title: "Custom Reports",
-      description: "Generate customizable reports for different stakeholders and time periods"
+      title: "Multiple Chart Types",
+      description: "Bar, line, pie, area, scatter plots and more visualization options"
     },
     {
       icon: Activity,
-      title: "Real-time Monitoring",
-      description: "Live dashboards with instant updates on student activities and metrics"
+      title: "Dashboard Builder",
+      description: "Drag-and-drop interface to create custom interactive dashboards"
     },
     {
       icon: Zap,
-      title: "Automated Insights",
-      description: "AI-powered analysis to identify patterns and provide actionable recommendations"
+      title: "Real-time Analytics",
+      description: "Live data updates and interactive filtering for instant insights"
     }
   ];
 
@@ -55,25 +55,25 @@ const Index = () => {
                 </span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                Transform Student Data Into
+                Complete Analytics Platform
                 <span className="block bg-gradient-primary bg-clip-text text-transparent mt-2">
-                  Actionable Insights
+                  Like Power BI, Built for Students
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground">
-                StudentAnalytics provides comprehensive analytics tools to track, analyze, and improve 
-                student performance with beautiful visualizations and powerful reporting.
+                Upload data, transform it, create stunning visualizations, and build interactive 
+                dashboards - all in one powerful platform designed for student analytics.
               </p>
               <div className="flex gap-4 pt-4">
-                <Link to="/dashboard">
+                <Link to="/auth">
                   <Button variant="hero" size="lg" className="gap-2">
-                    View Dashboard
+                    Get Started
                     <ArrowRight className="h-5 w-5" />
                   </Button>
                 </Link>
-                <Link to="/students">
+                <Link to="/data">
                   <Button variant="outline" size="lg">
-                    Manage Students
+                    View Demo
                   </Button>
                 </Link>
               </div>
@@ -95,13 +95,13 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold mb-4">
-              Powerful Features for
+              Everything You Need
               <span className="block bg-gradient-primary bg-clip-text text-transparent mt-2">
-                Complete Student Analytics
+                Upload → Transform → Visualize → Share
               </span>
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to understand and improve student outcomes in one unified platform
+              Complete data analytics workflow from import to interactive dashboards
             </p>
           </div>
 
