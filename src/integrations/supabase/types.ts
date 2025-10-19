@@ -14,7 +14,173 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dashboards: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean | null
+          layout: Json | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          layout?: Json | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          layout?: Json | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      datasets: {
+        Row: {
+          columns_schema: Json | null
+          created_at: string
+          description: string | null
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          name: string
+          row_count: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          columns_schema?: Json | null
+          created_at?: string
+          description?: string | null
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          row_count?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          columns_schema?: Json | null
+          created_at?: string
+          description?: string | null
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          row_count?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transformations: {
+        Row: {
+          config: Json
+          created_at: string
+          dataset_id: string
+          id: string
+          name: string
+          transformation_type: string
+          user_id: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          dataset_id: string
+          id?: string
+          name: string
+          transformation_type: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          dataset_id?: string
+          id?: string
+          name?: string
+          transformation_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transformations_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visualizations: {
+        Row: {
+          chart_type: string
+          config: Json
+          created_at: string
+          dashboard_id: string
+          dataset_id: string
+          id: string
+          name: string
+          position: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chart_type: string
+          config: Json
+          created_at?: string
+          dashboard_id: string
+          dataset_id: string
+          id?: string
+          name: string
+          position?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chart_type?: string
+          config?: Json
+          created_at?: string
+          dashboard_id?: string
+          dataset_id?: string
+          id?: string
+          name?: string
+          position?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visualizations_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "dashboards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visualizations_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
