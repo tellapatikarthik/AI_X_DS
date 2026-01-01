@@ -65,14 +65,14 @@ const Navbar = () => {
                     Data
                   </Button>
                 </Link>
-                <Link to="/dashboards">
+                <Link to="/workspace">
                   <Button 
-                    variant={isActive("/dashboards") ? "default" : "ghost"}
+                    variant={isActive("/workspace") ? "default" : "ghost"}
                     className="gap-2"
                     size="sm"
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    Dashboards
+                    Workspace
                   </Button>
                 </Link>
                 <Button 
