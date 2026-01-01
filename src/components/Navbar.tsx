@@ -1,32 +1,11 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Home, Database, LayoutDashboard, LogOut, User } from "lucide-react";
-import { toast } from "sonner";
+import { BarChart3, Home, MessageSquare, Wrench } from "lucide-react";
 
 const Navbar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
-  
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-    });
-    
-    return () => subscription.unsubscribe();
-  }, []);
   
   const isActive = (path: string) => location.pathname === path;
-  
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/");
-  };
   
   return (
     <nav className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-lg shadow-sm">
@@ -53,48 +32,27 @@ const Navbar = () => {
               </Button>
             </Link>
             
-            {user && (
-              <>
-                <Link to="/data">
-                  <Button 
-                    variant={isActive("/data") ? "default" : "ghost"}
-                    className="gap-2"
-                    size="sm"
-                  >
-                    <Database className="h-4 w-4" />
-                    Data
-                  </Button>
-                </Link>
-                <Link to="/workspace">
-                  <Button 
-                    variant={isActive("/workspace") ? "default" : "ghost"}
-                    className="gap-2"
-                    size="sm"
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Workspace
-                  </Button>
-                </Link>
-                <Button 
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSignOut}
-                  className="gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              </>
-            )}
+            <Link to="/prompting">
+              <Button 
+                variant={isActive("/prompting") ? "default" : "ghost"}
+                className="gap-2"
+                size="sm"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Prompting
+              </Button>
+            </Link>
             
-            {!user && (
-              <Link to="/auth">
-                <Button variant="hero" size="sm" className="gap-2">
-                  <User className="h-4 w-4" />
-                  Sign In
-                </Button>
-              </Link>
-            )}
+            <Link to="/datatool">
+              <Button 
+                variant={isActive("/datatool") ? "default" : "ghost"}
+                className="gap-2"
+                size="sm"
+              >
+                <Wrench className="h-4 w-4" />
+                DataTool
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
