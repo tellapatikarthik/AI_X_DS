@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileSpreadsheet, Sparkles, Loader2, ArrowLeft, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { applyColumnAliases, parseDatasetFile, type ParsedDataset } from "@/lib/datasetParser";
 
 const PromptingMode = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [parsedData, setParsedData] = useState<any[] | null>(null);
-  const [columns, setColumns] = useState<string[]>([]);
+  const [dataset, setDataset] = useState<ParsedDataset | null>(null);
+  const [columnAliases, setColumnAliases] = useState<Record<string, string>>({});
+
+  const displayDataset = useMemo(
+    () => (dataset ? applyColumnAliases(dataset, columnAliases) : null),
+    [dataset, columnAliases]
+  );
+
+  const columns = displayDataset?.columns ?? [];
+  const rowCount = displayDataset?.data.length ?? 0;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -27,54 +36,39 @@ const PromptingMode = () => {
 
   const parseFile = async (file: File) => {
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      if (lines.length === 0) {
-        toast.error("File is empty");
-        return;
-      }
-      
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      setColumns(headers);
-      
-      const data = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-        const row: Record<string, any> = {};
-        headers.forEach((header, index) => {
-          const value = values[index];
-          row[header] = isNaN(Number(value)) ? value : Number(value);
-        });
-        return row;
-      });
-      
-      setParsedData(data);
-      toast.success(`File loaded: ${data.length} rows, ${headers.length} columns`);
-    } catch (error) {
-      toast.error("Failed to parse file");
+      const parsed = await parseDatasetFile(file);
+      setDataset(parsed);
+      setColumnAliases({});
+      toast.success(`File loaded: ${parsed.data.length} rows, ${parsed.columns.length} columns`);
+    } catch (error: any) {
+      console.error("File parse error:", error);
+      setDataset(null);
+      setColumnAliases({});
+      toast.error(error?.message || "Failed to parse file");
     }
   };
 
   const handleAnalyze = async () => {
-    if (!file || !parsedData) {
-      toast.error("Please upload a file first");
+    if (!file || !displayDataset) {
+      toast.error("Please upload a valid file first");
       return;
     }
-    
+
     if (!prompt.trim()) {
       toast.error("Please describe what visualizations you need");
       return;
     }
 
     setLoading(true);
-    
+
     // Store data in sessionStorage for the workspace
-    sessionStorage.setItem('analyticsData', JSON.stringify(parsedData));
-    sessionStorage.setItem('analyticsColumns', JSON.stringify(columns));
-    sessionStorage.setItem('analyticsPrompt', prompt);
-    sessionStorage.setItem('analyticsMode', 'prompting');
-    
+    sessionStorage.setItem("analyticsData", JSON.stringify(displayDataset.data));
+    sessionStorage.setItem("analyticsColumns", JSON.stringify(displayDataset.columns));
+    sessionStorage.setItem("analyticsPrompt", prompt);
+    sessionStorage.setItem("analyticsMode", "prompting");
+
     // Navigate to workspace
-    navigate('/workspace');
+    navigate("/workspace");
     setLoading(false);
   };
 
@@ -148,29 +142,39 @@ const PromptingMode = () => {
                       <p className="font-medium text-sm">{file.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {(file.size / 1024).toFixed(2)} KB
-                        {parsedData && ` • ${parsedData.length} rows • ${columns.length} columns`}
+                        {displayDataset && ` • ${rowCount} rows • ${columns.length} columns`}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Columns Preview */}
-              {columns.length > 0 && (
-                <div>
-                  <Label className="text-base font-semibold">Available Columns</Label>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {columns.map((col, index) => (
-                      <span 
-                        key={index}
-                        className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm"
-                      >
-                        {col}
-                      </span>
+              {/* Column Names (editable) */}
+              {dataset?.columns?.length ? (
+                <div className="space-y-3">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <Label className="text-base font-semibold">Column names</Label>
+                    <p className="text-xs text-muted-foreground">Edit if headers look incorrect</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {dataset.columns.map((col, index) => (
+                      <div key={col} className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Column {index + 1}</Label>
+                        <Input
+                          value={columnAliases[col] ?? col}
+                          onChange={(e) =>
+                            setColumnAliases((prev) => ({
+                              ...prev,
+                              [col]: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Prompt Input */}
               <div>
@@ -189,7 +193,7 @@ const PromptingMode = () => {
               {/* Submit Button */}
               <Button
                 onClick={handleAnalyze}
-                disabled={loading || !file || !prompt.trim()}
+                disabled={loading || !file || !displayDataset || !prompt.trim()}
                 variant="hero"
                 className="w-full"
                 size="lg"

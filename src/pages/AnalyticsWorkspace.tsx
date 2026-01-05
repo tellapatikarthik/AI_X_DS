@@ -65,6 +65,22 @@ const AnalyticsWorkspace = () => {
     setLoading(false);
   }, [navigate]);
 
+  const isNumericColumn = (col: string, dataSample: any[]) => {
+    const sample = dataSample.slice(0, 30);
+    return sample.some((row) => typeof row?.[col] === "number" && !Number.isNaN(row[col]));
+  };
+
+  const getDefaultAxes = (cols: string[], dataSample: any[]) => {
+    const xAxis = cols[0] || "";
+    const yAxis =
+      cols.find((c) => c !== xAxis && isNumericColumn(c, dataSample)) ||
+      cols.find((c) => isNumericColumn(c, dataSample)) ||
+      cols[1] ||
+      xAxis;
+
+    return { xAxis, yAxis: yAxis || "" };
+  };
+
   const generateAISuggestions = async (cols: string[], data: any[], userPrompt: string) => {
     setAiLoading(true);
     try {
@@ -82,12 +98,22 @@ const AnalyticsWorkspace = () => {
         setSuggestions(response.suggestions);
         
         // Auto-apply first 3 suggestions in prompting mode
+        const defaults = getDefaultAxes(cols, data);
+
         response.suggestions.slice(0, 3).forEach((suggestion: Suggestion) => {
           const newViz: VisualizationConfig & { id: string } = {
             chartType: suggestion.chartType,
             title: suggestion.title,
-            xAxis: suggestion.xAxis || cols[0] || "",
-            yAxis: suggestion.yAxis || cols[1] || cols[0] || "",
+            xAxis:
+              suggestion.xAxis && cols.includes(suggestion.xAxis)
+                ? suggestion.xAxis
+                : defaults.xAxis,
+            yAxis:
+              suggestion.yAxis &&
+              cols.includes(suggestion.yAxis) &&
+              isNumericColumn(suggestion.yAxis, data)
+                ? suggestion.yAxis
+                : defaults.yAxis,
             description: suggestion.description,
             id: crypto.randomUUID(),
           };
@@ -130,11 +156,21 @@ const AnalyticsWorkspace = () => {
   };
 
   const handleApplySuggestion = (suggestion: Suggestion) => {
+    const defaults = getDefaultAxes(columns, parsedData);
+
     const newViz: VisualizationConfig & { id: string } = {
       chartType: suggestion.chartType,
       title: suggestion.title,
-      xAxis: suggestion.xAxis || columns[0] || "",
-      yAxis: suggestion.yAxis || columns[1] || columns[0] || "",
+      xAxis:
+        suggestion.xAxis && columns.includes(suggestion.xAxis)
+          ? suggestion.xAxis
+          : defaults.xAxis,
+      yAxis:
+        suggestion.yAxis &&
+        columns.includes(suggestion.yAxis) &&
+        isNumericColumn(suggestion.yAxis, parsedData)
+          ? suggestion.yAxis
+          : defaults.yAxis,
       description: suggestion.description,
       id: crypto.randomUUID(),
     };
