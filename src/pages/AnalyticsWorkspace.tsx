@@ -70,9 +70,9 @@ const AnalyticsWorkspace = () => {
     try {
       const { data: response, error } = await supabase.functions.invoke('suggest-visualizations', {
         body: {
-          columns: cols.map(name => ({ name, type: 'text' })),
+          userRequest: userPrompt,
+          columns: cols,
           sampleData: data.slice(0, 10),
-          userPrompt
         }
       });
 
