@@ -37,11 +37,37 @@ export const VisualizationBuilder = ({
   onCancel,
 }: VisualizationBuilderProps) => {
   const [title, setTitle] = useState(`New ${getChartLabel(chartType)}`);
-  const [xAxis, setXAxis] = useState(columns[0]?.name || "");
-  const [yAxis, setYAxis] = useState(columns[1]?.name || columns[0]?.name || "");
+  const [xAxis, setXAxis] = useState(() => columns[0]?.name || "");
+  const [yAxis, setYAxis] = useState(() => {
+    const x = columns[0]?.name || "";
+    const sample = data.slice(0, 30);
+    const isNumeric = (name: string) =>
+      sample.some((row) => typeof row?.[name] === "number" && !Number.isNaN(row[name]));
+
+    return (
+      columns.find((c) => c.name !== x && isNumeric(c.name))?.name ||
+      columns.find((c) => isNumeric(c.name))?.name ||
+      columns[1]?.name ||
+      x
+    );
+  });
 
   useEffect(() => {
     setTitle(`New ${getChartLabel(chartType)}`);
+
+    const x = columns[0]?.name || "";
+    const sample = data.slice(0, 30);
+    const isNumeric = (name: string) =>
+      sample.some((row) => typeof row?.[name] === "number" && !Number.isNaN(row[name]));
+
+    const y =
+      columns.find((c) => c.name !== x && isNumeric(c.name))?.name ||
+      columns.find((c) => isNumeric(c.name))?.name ||
+      columns[1]?.name ||
+      x;
+
+    setXAxis(x);
+    setYAxis(y);
   }, [chartType]);
 
   const handleSave = () => {
