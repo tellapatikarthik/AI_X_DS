@@ -8,7 +8,7 @@ import {
   Target,
   TrendingUp,
   Layers,
-  Gauge,
+  CircleDot,
   type LucideIcon
 } from "lucide-react";
 
@@ -39,7 +39,7 @@ const chartIcons: Record<ChartType, LucideIcon> = {
   radar: Activity,
   treemap: Layers,
   funnel: TrendingUp,
-  gauge: Gauge,
+  gauge: CircleDot,
 };
 
 const chartLabels: Record<ChartType, string> = {

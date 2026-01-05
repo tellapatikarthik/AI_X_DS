@@ -43,7 +43,7 @@ export const AIVisualizationInput = ({
         body: {
           userRequest: query,
           columns: columns.map((c) => c.name),
-          sampleData,
+          sampleData: sampleData.slice(0, 10),
         },
       });
 

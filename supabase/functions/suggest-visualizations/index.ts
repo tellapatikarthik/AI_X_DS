@@ -11,7 +11,10 @@ serve(async (req) => {
   }
 
   try {
-    const { userRequest, columns, sampleData } = await req.json();
+    const body = await req.json();
+    const userRequest = body.userRequest || body.userPrompt || "";
+    const columns = body.columns;
+    const sampleData = body.sampleData;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
