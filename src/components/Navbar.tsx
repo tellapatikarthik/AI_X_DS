@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Home, MessageSquare, Wrench } from "lucide-react";
+import { BarChart3, Home, MessageSquare, Wrench, Database } from "lucide-react";
 
 const Navbar = () => {
   const location = useLocation();
@@ -20,7 +20,7 @@ const Navbar = () => {
             </span>
           </Link>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <Link to="/">
               <Button 
                 variant={isActive("/") ? "default" : "ghost"} 
@@ -28,7 +28,7 @@ const Navbar = () => {
                 size="sm"
               >
                 <Home className="h-4 w-4" />
-                Home
+                <span className="hidden sm:inline">Home</span>
               </Button>
             </Link>
             
@@ -39,7 +39,7 @@ const Navbar = () => {
                 size="sm"
               >
                 <MessageSquare className="h-4 w-4" />
-                Prompting
+                <span className="hidden sm:inline">Prompting</span>
               </Button>
             </Link>
             
@@ -50,7 +50,18 @@ const Navbar = () => {
                 size="sm"
               >
                 <Wrench className="h-4 w-4" />
-                DataTool
+                <span className="hidden sm:inline">DataTool</span>
+              </Button>
+            </Link>
+
+            <Link to="/query-tool">
+              <Button 
+                variant={isActive("/query-tool") ? "default" : "ghost"}
+                className="gap-2"
+                size="sm"
+              >
+                <Database className="h-4 w-4" />
+                <span className="hidden sm:inline">Query Tool</span>
               </Button>
             </Link>
           </div>
