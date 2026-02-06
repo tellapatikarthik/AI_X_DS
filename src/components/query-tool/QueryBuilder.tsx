@@ -49,28 +49,32 @@ interface QueryBuilderProps {
 }
 
 const OPERATORS: { value: ConditionOperator; label: string; types: string[] }[] = [
-  { value: "equals", label: "Equals", types: ["string", "number", "date", "boolean"] },
-  { value: "not_equals", label: "Not Equals", types: ["string", "number", "date", "boolean"] },
-  { value: "greater_than", label: "Greater Than", types: ["number", "date"] },
-  { value: "less_than", label: "Less Than", types: ["number", "date"] },
-  { value: "greater_equal", label: "Greater or Equal", types: ["number", "date"] },
-  { value: "less_equal", label: "Less or Equal", types: ["number", "date"] },
-  { value: "contains", label: "Contains", types: ["string"] },
+  { value: "equals", label: "= Equals", types: ["string", "number", "date", "boolean"] },
+  { value: "not_equals", label: "≠ Not Equals", types: ["string", "number", "date", "boolean"] },
+  { value: "greater_than", label: "> Greater Than", types: ["number", "date"] },
+  { value: "less_than", label: "< Less Than", types: ["number", "date"] },
+  { value: "greater_equal", label: "≥ Greater or Equal", types: ["number", "date"] },
+  { value: "less_equal", label: "≤ Less or Equal", types: ["number", "date"] },
+  { value: "contains", label: "Contains (LIKE)", types: ["string"] },
   { value: "not_contains", label: "Not Contains", types: ["string"] },
   { value: "starts_with", label: "Starts With", types: ["string"] },
   { value: "ends_with", label: "Ends With", types: ["string"] },
-  { value: "is_empty", label: "Is Empty", types: ["string", "number", "date"] },
-  { value: "is_not_empty", label: "Is Not Empty", types: ["string", "number", "date"] },
-  { value: "between", label: "Between", types: ["number", "date"] },
+  { value: "is_empty", label: "Is NULL/Empty", types: ["string", "number", "date"] },
+  { value: "is_not_empty", label: "Is NOT NULL", types: ["string", "number", "date"] },
+  { value: "between", label: "BETWEEN", types: ["number", "date"] },
+  { value: "in_list", label: "IN (list)", types: ["string", "number"] },
 ];
 
 const AGGREGATIONS: { value: AggregationFunction; label: string }[] = [
-  { value: "sum", label: "Sum" },
-  { value: "average", label: "Average" },
-  { value: "count", label: "Count" },
-  { value: "min", label: "Minimum" },
-  { value: "max", label: "Maximum" },
-  { value: "count_distinct", label: "Count Unique" },
+  { value: "sum", label: "SUM" },
+  { value: "average", label: "AVG" },
+  { value: "count", label: "COUNT" },
+  { value: "count_distinct", label: "COUNT DISTINCT" },
+  { value: "min", label: "MIN" },
+  { value: "max", label: "MAX" },
+  { value: "median", label: "MEDIAN" },
+  { value: "stddev", label: "STD DEV" },
+  { value: "variance", label: "VARIANCE" },
 ];
 
 const QueryBuilder = ({
@@ -85,11 +89,14 @@ const QueryBuilder = ({
   const { toast } = useToast();
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [conditions, setConditions] = useState<QueryCondition[]>([]);
+  const [conditionLogic, setConditionLogic] = useState<"and" | "or">("and");
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ column: string; direction: "asc" | "desc" }[]>([]);
   const [aggregations, setAggregations] = useState<{ column: string; function: AggregationFunction }[]>([]);
   const [previewData, setPreviewData] = useState<Record<string, any>[] | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [limitRows, setLimitRows] = useState<number | null>(null);
+  const [distinctOnly, setDistinctOnly] = useState(false);
 
   // Combine all columns from selected datasets
   const allColumns = useMemo(() => {
@@ -124,9 +131,12 @@ const QueryBuilder = ({
     if (initialConfig) {
       setSelectedColumns(initialConfig.columns || []);
       setConditions(initialConfig.conditions || []);
+      setConditionLogic(initialConfig.conditionLogic || "and");
       setGroupByColumns(initialConfig.groupBy || []);
       setSortConfig(initialConfig.sortBy || []);
       setAggregations(initialConfig.aggregations || []);
+      setLimitRows(initialConfig.limit || null);
+      setDistinctOnly(initialConfig.distinct || false);
       return;
     }
 
@@ -175,44 +185,56 @@ const QueryBuilder = ({
     try {
       let result = [...allData];
 
-      // Apply filters
-      conditions.forEach((cond) => {
+      // Apply filters with AND/OR logic
+      if (conditions.length > 0) {
         result = result.filter((row) => {
-          const value = row[cond.column];
-          const condValue = cond.value;
+          const conditionResults = conditions.map((cond) => {
+            const value = row[cond.column];
+            const condValue = cond.value;
 
-          switch (cond.operator) {
-            case "equals":
-              return String(value).toLowerCase() === String(condValue).toLowerCase();
-            case "not_equals":
-              return String(value).toLowerCase() !== String(condValue).toLowerCase();
-            case "greater_than":
-              return Number(value) > Number(condValue);
-            case "less_than":
-              return Number(value) < Number(condValue);
-            case "greater_equal":
-              return Number(value) >= Number(condValue);
-            case "less_equal":
-              return Number(value) <= Number(condValue);
-            case "contains":
-              return String(value).toLowerCase().includes(String(condValue).toLowerCase());
-            case "not_contains":
-              return !String(value).toLowerCase().includes(String(condValue).toLowerCase());
-            case "starts_with":
-              return String(value).toLowerCase().startsWith(String(condValue).toLowerCase());
-            case "ends_with":
-              return String(value).toLowerCase().endsWith(String(condValue).toLowerCase());
-            case "is_empty":
-              return value === null || value === undefined || value === "";
-            case "is_not_empty":
-              return value !== null && value !== undefined && value !== "";
-            case "between":
-              return Number(value) >= Number(condValue) && Number(value) <= Number(cond.value2);
-            default:
-              return true;
+            switch (cond.operator) {
+              case "equals":
+                return String(value).toLowerCase() === String(condValue).toLowerCase();
+              case "not_equals":
+                return String(value).toLowerCase() !== String(condValue).toLowerCase();
+              case "greater_than":
+                return Number(value) > Number(condValue);
+              case "less_than":
+                return Number(value) < Number(condValue);
+              case "greater_equal":
+                return Number(value) >= Number(condValue);
+              case "less_equal":
+                return Number(value) <= Number(condValue);
+              case "contains":
+                return String(value).toLowerCase().includes(String(condValue).toLowerCase());
+              case "not_contains":
+                return !String(value).toLowerCase().includes(String(condValue).toLowerCase());
+              case "starts_with":
+                return String(value).toLowerCase().startsWith(String(condValue).toLowerCase());
+              case "ends_with":
+                return String(value).toLowerCase().endsWith(String(condValue).toLowerCase());
+              case "is_empty":
+                return value === null || value === undefined || value === "";
+              case "is_not_empty":
+                return value !== null && value !== undefined && value !== "";
+              case "between":
+                return Number(value) >= Number(condValue) && Number(value) <= Number(cond.value2);
+              case "in_list":
+                const listValues = String(condValue).split(",").map(v => v.trim().toLowerCase());
+                return listValues.includes(String(value).toLowerCase());
+              default:
+                return true;
+            }
+          });
+
+          // Apply AND or OR logic
+          if (conditionLogic === "and") {
+            return conditionResults.every(r => r);
+          } else {
+            return conditionResults.some(r => r);
           }
         });
-      });
+      }
 
       // Apply sorting
       if (sortConfig.length > 0) {
@@ -280,6 +302,17 @@ const QueryBuilder = ({
         });
       }
 
+      // Apply distinct if selected
+      if (distinctOnly) {
+        const seen = new Set<string>();
+        result = result.filter((row) => {
+          const key = JSON.stringify(row);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
       // Select only chosen columns if specified
       if (selectedColumns.length > 0 && groupByColumns.length === 0) {
         result = result.map((row) => {
@@ -289,6 +322,11 @@ const QueryBuilder = ({
           });
           return filtered;
         });
+      }
+
+      // Apply limit
+      if (limitRows && limitRows > 0) {
+        result = result.slice(0, limitRows);
       }
 
       // Generate summary
@@ -341,9 +379,12 @@ const QueryBuilder = ({
         subConcept,
         columns: selectedColumns,
         conditions,
+        conditionLogic,
         groupBy: groupByColumns,
         sortBy: sortConfig,
         aggregations,
+        limit: limitRows || undefined,
+        distinct: distinctOnly,
       };
       onConfigChange(config);
       onExecute(queryResult);
@@ -374,10 +415,33 @@ const QueryBuilder = ({
   const renderConceptUI = () => {
     switch (concept) {
       case "filter":
+      case "logical":
         return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Filter Conditions</Label>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <Label>Filter Conditions</Label>
+                {conditions.length > 1 && (
+                  <div className="flex items-center gap-1 border rounded-lg p-0.5">
+                    <Button
+                      variant={conditionLogic === "and" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-7 px-3"
+                      onClick={() => setConditionLogic("and")}
+                    >
+                      AND
+                    </Button>
+                    <Button
+                      variant={conditionLogic === "or" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-7 px-3"
+                      onClick={() => setConditionLogic("or")}
+                    >
+                      OR
+                    </Button>
+                  </div>
+                )}
+              </div>
               <Button variant="outline" size="sm" onClick={addCondition} className="gap-1">
                 <Plus className="h-4 w-4" />
                 Add Condition
@@ -391,9 +455,11 @@ const QueryBuilder = ({
             )}
 
             {conditions.map((cond, index) => (
-              <div key={cond.id} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <div key={cond.id} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg flex-wrap">
                 {index > 0 && (
-                  <Badge variant="secondary" className="mr-2">AND</Badge>
+                  <Badge variant={conditionLogic === "or" ? "default" : "secondary"} className="mr-2">
+                    {conditionLogic.toUpperCase()}
+                  </Badge>
                 )}
                 <Select
                   value={cond.column}
@@ -649,10 +715,169 @@ const QueryBuilder = ({
         );
 
       case "summary":
+      case "compare":
+      case "time_analysis":
         return (
           <div className="p-4 bg-muted/50 rounded-lg">
             <p className="text-center text-muted-foreground">
               Click "Run Query" to generate a summary of your data
+            </p>
+          </div>
+        );
+
+      case "select":
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="distinct"
+                  checked={distinctOnly}
+                  onChange={(e) => setDistinctOnly(e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor="distinct">DISTINCT (remove duplicates)</Label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Select Columns (* = all)</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedColumns(allColumns.map(c => c.name))}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedColumns([])}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allColumns.map((col) => (
+                  <Button
+                    key={col.name}
+                    variant={selectedColumns.includes(col.name) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedColumns(
+                        selectedColumns.includes(col.name)
+                          ? selectedColumns.filter((c) => c !== col.name)
+                          : [...selectedColumns, col.name]
+                      );
+                    }}
+                  >
+                    {col.name}
+                    <Badge variant="outline" className="ml-1 text-xs">{col.type}</Badge>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case "limit":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Limit Rows (TOP N)</Label>
+                <Input
+                  type="number"
+                  value={limitRows || ""}
+                  onChange={(e) => setLimitRows(e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="e.g., 10, 100, 1000"
+                  min={1}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Quick Options</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {[10, 50, 100, 500, 1000].map((n) => (
+                    <Button
+                      key={n}
+                      variant={limitRows === n ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setLimitRows(n)}
+                    >
+                      Top {n}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "join":
+      case "set_operations":
+      case "subquery":
+        return (
+          <div className="p-4 bg-muted/50 rounded-lg border-2 border-dashed">
+            <p className="text-center text-muted-foreground">
+              <span className="block text-lg font-medium mb-1">{concept.toUpperCase()}</span>
+              This advanced feature requires multiple datasets. 
+              Upload additional datasets to enable this functionality.
+            </p>
+          </div>
+        );
+
+      case "string_functions":
+      case "date_functions":
+      case "numeric_functions":
+      case "conditional":
+      case "window":
+      case "type_conversion":
+      case "null_handling":
+        return (
+          <div className="space-y-4">
+            <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <p className="text-sm">
+                <strong>{concept.replace("_", " ").toUpperCase()}</strong> operations are applied during query execution. 
+                Select the columns you want to transform below.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Select Columns</Label>
+              <div className="flex flex-wrap gap-2">
+                {allColumns.map((col) => (
+                  <Button
+                    key={col.name}
+                    variant={selectedColumns.includes(col.name) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedColumns(
+                        selectedColumns.includes(col.name)
+                          ? selectedColumns.filter((c) => c !== col.name)
+                          : [...selectedColumns, col.name]
+                      );
+                    }}
+                  >
+                    {col.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case "modify":
+      case "transactions":
+      case "constraints":
+      case "performance":
+        return (
+          <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30">
+            <p className="text-sm text-destructive">
+              <strong>⚠️ {concept.toUpperCase()}</strong>: This is an informational concept. 
+              Data modifications are not applied in this read-only query tool. 
+              Use this to understand SQL concepts for when you work with actual databases.
             </p>
           </div>
         );
