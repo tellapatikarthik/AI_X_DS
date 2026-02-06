@@ -5,6 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Filter,
   ArrowUpDown,
@@ -17,6 +18,22 @@ import {
   Check,
   ChevronRight,
   Info,
+  Columns,
+  Binary,
+  Type,
+  Hash,
+  GitBranch,
+  LayoutGrid,
+  ListEnd,
+  Edit,
+  ArrowLeftRight,
+  CircleSlash,
+  TrendingUp,
+  Shield,
+  Lock,
+  Zap,
+  Braces,
+  Combine,
 } from "lucide-react";
 import { CONCEPTS, DatasetInfo } from "@/types/queryTool";
 
@@ -38,6 +55,22 @@ const iconMap: Record<string, any> = {
   Calendar,
   Merge,
   Lightbulb,
+  Columns,
+  Binary,
+  Type,
+  Hash,
+  GitBranch,
+  LayoutGrid,
+  ListEnd,
+  Edit,
+  ArrowLeftRight,
+  CircleSlash,
+  TrendingUp,
+  Shield,
+  Lock,
+  Zap,
+  Braces,
+  Combine,
 };
 
 const ConceptSelector = ({
@@ -62,9 +95,17 @@ const ConceptSelector = ({
   const isConceptRelevant = (conceptId: string) => {
     switch (conceptId) {
       case "time_analysis":
+      case "date_functions":
         return availableTypes.has("date");
-      case "combine":
+      case "join":
+      case "set_operations":
         return datasets.length > 1;
+      case "modify":
+      case "transactions":
+      case "constraints":
+      case "performance":
+        // These are informational/educational concepts
+        return true;
       default:
         return true;
     }
@@ -80,6 +121,9 @@ const ConceptSelector = ({
   const getSuggestions = () => {
     const suggestions: string[] = [];
     
+    // Always suggest select as starting point
+    suggestions.push("select");
+    
     if (availableTypes.has("number")) {
       suggestions.push("aggregate");
     }
@@ -87,13 +131,16 @@ const ConceptSelector = ({
       suggestions.push("time_analysis");
     }
     if (datasets.length > 1) {
-      suggestions.push("combine");
+      suggestions.push("join");
     }
     if (datasets.some((d) => d.rowCount > 100)) {
       suggestions.push("filter");
     }
+    if (availableTypes.has("string")) {
+      suggestions.push("string_functions");
+    }
 
-    return suggestions;
+    return suggestions.slice(0, 4); // Limit to 4 suggestions
   };
 
   const suggestions = getSuggestions();
@@ -114,59 +161,61 @@ const ConceptSelector = ({
         )}
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Concept Grid */}
+        {/* Concept Grid - Scrollable */}
         {!selectedConcept && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {CONCEPTS.map((concept) => {
-              const Icon = iconMap[concept.icon] || Lightbulb;
-              const relevant = isConceptRelevant(concept.id);
-              const suggested = suggestions.includes(concept.id);
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {CONCEPTS.map((concept) => {
+                const Icon = iconMap[concept.icon] || Lightbulb;
+                const relevant = isConceptRelevant(concept.id);
+                const suggested = suggestions.includes(concept.id);
 
-              return (
-                <Tooltip key={concept.id}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => relevant && onConceptSelect(concept.id)}
-                      disabled={!relevant}
-                      className={`relative p-4 rounded-lg border text-left transition-all ${
-                        relevant
-                          ? "hover:border-primary hover:shadow-md cursor-pointer"
-                          : "opacity-50 cursor-not-allowed"
-                      } ${suggested ? "border-primary/50 bg-primary/5" : ""}`}
-                    >
-                      {suggested && (
-                        <Badge className="absolute -top-2 -right-2 text-xs bg-primary">
-                          Suggested
-                        </Badge>
+                return (
+                  <Tooltip key={concept.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => relevant && onConceptSelect(concept.id)}
+                        disabled={!relevant}
+                        className={`relative p-3 rounded-lg border text-left transition-all ${
+                          relevant
+                            ? "hover:border-primary hover:shadow-md cursor-pointer"
+                            : "opacity-50 cursor-not-allowed"
+                        } ${suggested ? "border-primary/50 bg-primary/5" : ""}`}
+                      >
+                        {suggested && (
+                          <Badge className="absolute -top-2 -right-2 text-[10px] px-1.5 py-0.5 bg-primary">
+                            Suggested
+                          </Badge>
+                        )}
+                        <Icon
+                          className={`h-6 w-6 mb-1.5 ${
+                            suggested ? "text-primary" : "text-muted-foreground"
+                          }`}
+                        />
+                        <h4 className="font-medium text-sm">{concept.name}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {concept.description}
+                        </p>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium">{concept.name}</p>
+                      <p className="text-xs">{concept.description}</p>
+                      {!relevant && (
+                        <p className="text-xs text-destructive mt-1">
+                          {concept.id === "time_analysis" || concept.id === "date_functions"
+                            ? "Requires date columns"
+                            : concept.id === "join" || concept.id === "set_operations"
+                            ? "Requires multiple datasets"
+                            : "Not available for this data"}
+                        </p>
                       )}
-                      <Icon
-                        className={`h-8 w-8 mb-2 ${
-                          suggested ? "text-primary" : "text-muted-foreground"
-                        }`}
-                      />
-                      <h4 className="font-medium">{concept.name}</h4>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {concept.description}
-                      </p>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-medium">{concept.name}</p>
-                    <p className="text-xs">{concept.description}</p>
-                    {!relevant && (
-                      <p className="text-xs text-destructive mt-1">
-                        {concept.id === "time_analysis"
-                          ? "Requires date columns"
-                          : concept.id === "combine"
-                          ? "Requires multiple datasets"
-                          : "Not available for this data"}
-                      </p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </ScrollArea>
         )}
 
         {/* Sub-Concept Selection */}
