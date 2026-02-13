@@ -34,7 +34,6 @@ import {
   Save,
   Lightbulb,
   TrendingUp,
-  Hash,
   Calculator,
 } from "lucide-react";
 import { QueryResult, QueryConfig, DatasetInfo } from "@/types/queryTool";
@@ -268,34 +267,33 @@ const ResultsViewer = ({ result, config, datasets }: ResultsViewerProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
+      {/* Summary Stats Row */}
       {result.summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Hash className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">Total Rows</span>
-              </div>
-              <p className="text-2xl font-bold mt-1">
-                {result.summary.totalRows.toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-
-          {result.summary.metrics.slice(0, 3).map((metric, i) => (
-            <Card key={i}>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <Calculator className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground truncate">
-                    {metric.label}
-                  </span>
-                </div>
-                <p className="text-2xl font-bold mt-1">{metric.value}</p>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-muted px-4 py-2 font-medium text-sm flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-primary" />
+            Summary Statistics
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Metric</TableHead>
+                <TableHead>Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium">Total Rows</TableCell>
+                <TableCell>{result.summary.totalRows.toLocaleString()}</TableCell>
+              </TableRow>
+              {result.summary.metrics.map((metric, i) => (
+                <TableRow key={i}>
+                  <TableCell className="font-medium">{metric.label}</TableCell>
+                  <TableCell>{metric.value}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 

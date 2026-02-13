@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import {
   DatasetInfo,
+  ColumnInfo,
   QueryConfig,
   QueryCondition,
   QueryResult,
@@ -45,6 +46,9 @@ interface QueryBuilderProps {
   initialConfig: QueryConfig | null;
   onExecute: (result: QueryResult) => void;
   onConfigChange: (config: QueryConfig) => void;
+  onDatasetUpdate?: (datasetId: string, newData: Record<string, any>[], newColumns?: ColumnInfo[]) => void;
+  onDatasetCreate?: (dataset: DatasetInfo) => void;
+  onDatasetDelete?: (datasetId: string) => void;
   isActive: boolean;
 }
 
@@ -84,6 +88,9 @@ const QueryBuilder = ({
   initialConfig,
   onExecute,
   onConfigChange,
+  onDatasetUpdate,
+  onDatasetCreate,
+  onDatasetDelete,
   isActive,
 }: QueryBuilderProps) => {
   const { toast } = useToast();
@@ -97,6 +104,19 @@ const QueryBuilder = ({
   const [isExecuting, setIsExecuting] = useState(false);
   const [limitRows, setLimitRows] = useState<number | null>(null);
   const [distinctOnly, setDistinctOnly] = useState(false);
+
+  // Modify state
+  const [modifyTargetDataset, setModifyTargetDataset] = useState<string>(datasets[0]?.id || "");
+  const [modifyRowValues, setModifyRowValues] = useState<Record<string, string>>({});
+  const [modifyUpdateColumn, setModifyUpdateColumn] = useState<string>("");
+  const [modifyUpdateValue, setModifyUpdateValue] = useState<string>("");
+  const [modifyDeleteColumn, setModifyDeleteColumn] = useState<string>("");
+  const [modifyDeleteValue, setModifyDeleteValue] = useState<string>("");
+  const [modifyNewColName, setModifyNewColName] = useState<string>("");
+  const [modifyNewColDefault, setModifyNewColDefault] = useState<string>("");
+  const [modifyDropColName, setModifyDropColName] = useState<string>("");
+  const [modifyNewTableName, setModifyNewTableName] = useState<string>("");
+  const [modifyNewTableCols, setModifyNewTableCols] = useState<string>("");
 
   // Combine all columns from selected datasets
   const allColumns = useMemo(() => {
@@ -185,6 +205,52 @@ const QueryBuilder = ({
     return OPERATORS.filter((op) => op.types.includes(column.type));
   };
 
+  // Helper to compute aggregation values
+  const computeAggregation = (
+    fn: AggregationFunction,
+    values: number[],
+    rows: Record<string, any>[],
+    column: string
+  ): number => {
+    if (values.length === 0) return 0;
+    switch (fn) {
+      case "sum":
+        return values.reduce((a, b) => a + b, 0);
+      case "average":
+        return values.reduce((a, b) => a + b, 0) / values.length;
+      case "count":
+        return rows.length;
+      case "count_distinct":
+        return new Set(rows.map((r) => r[column])).size;
+      case "min":
+        return Math.min(...values);
+      case "max":
+        return Math.max(...values);
+      case "median": {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      }
+      case "mode": {
+        const freq = new Map<number, number>();
+        values.forEach((v) => freq.set(v, (freq.get(v) || 0) + 1));
+        let maxFreq = 0, modeVal = values[0];
+        freq.forEach((count, val) => { if (count > maxFreq) { maxFreq = count; modeVal = val; } });
+        return modeVal;
+      }
+      case "variance": {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        return values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+      }
+      case "stddev": {
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        return Math.sqrt(values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length);
+      }
+      default:
+        return 0;
+    }
+  };
+
   // Execute query
   const executeQuery = () => {
     setIsExecuting(true);
@@ -261,52 +327,42 @@ const QueryBuilder = ({
       }
 
       // Apply grouping and aggregations
-      if (groupByColumns.length > 0 && aggregations.length > 0) {
-        const groups = new Map<string, Record<string, any>[]>();
-        
-        result.forEach((row) => {
-          const key = groupByColumns.map((col) => row[col]).join("|||");
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key)!.push(row);
-        });
-
-        result = Array.from(groups.entries()).map(([key, rows]) => {
-          const grouped: Record<string, any> = {};
+      if (aggregations.length > 0) {
+        if (groupByColumns.length > 0) {
+          const groups = new Map<string, Record<string, any>[]>();
           
-          // Add group by columns
-          groupByColumns.forEach((col, i) => {
-            grouped[col] = key.split("|||")[i];
+          result.forEach((row) => {
+            const key = groupByColumns.map((col) => row[col]).join("|||");
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(row);
           });
 
-          // Add aggregations
+          result = Array.from(groups.entries()).map(([key, rows]) => {
+            const grouped: Record<string, any> = {};
+            
+            groupByColumns.forEach((col, i) => {
+              grouped[col] = key.split("|||")[i];
+            });
+
+            aggregations.forEach((agg) => {
+              const values = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+              grouped[`${agg.function}_${agg.column}`] = computeAggregation(agg.function, values, rows, agg.column);
+            });
+
+            return grouped;
+          });
+        } else {
+          // No groupBy — treat entire dataset as one group
+          const rows = result;
+          const grouped: Record<string, any> = {};
+
           aggregations.forEach((agg) => {
             const values = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
-            switch (agg.function) {
-              case "sum":
-                grouped[`${agg.function}_${agg.column}`] = values.reduce((a, b) => a + b, 0);
-                break;
-              case "average":
-                grouped[`${agg.function}_${agg.column}`] = values.length > 0
-                  ? values.reduce((a, b) => a + b, 0) / values.length
-                  : 0;
-                break;
-              case "count":
-                grouped[`${agg.function}_${agg.column}`] = rows.length;
-                break;
-              case "min":
-                grouped[`${agg.function}_${agg.column}`] = Math.min(...values);
-                break;
-              case "max":
-                grouped[`${agg.function}_${agg.column}`] = Math.max(...values);
-                break;
-              case "count_distinct":
-                grouped[`${agg.function}_${agg.column}`] = new Set(rows.map((r) => r[agg.column])).size;
-                break;
-            }
+            grouped[`${agg.function}_${agg.column}`] = computeAggregation(agg.function, values, rows, agg.column);
           });
 
-          return grouped;
-        });
+          result = [grouped];
+        }
       }
 
       // Apply distinct if selected
@@ -900,16 +956,250 @@ const QueryBuilder = ({
         );
 
       case "modify":
-      case "transactions":
-      case "constraints":
-      case "performance":
+        const targetDs = datasets.find(d => d.id === modifyTargetDataset) || datasets[0];
+        const targetCols = targetDs?.columns || [];
         return (
-          <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30">
-            <p className="text-sm text-destructive">
-              <strong>⚠️ {concept.toUpperCase()}</strong>: This is an informational concept. 
-              Data modifications are not applied in this read-only query tool. 
-              Use this to understand SQL concepts for when you work with actual databases.
-            </p>
+          <div className="space-y-6">
+            {datasets.length > 1 && (
+              <div className="space-y-2">
+                <Label>Target Dataset</Label>
+                <Select value={modifyTargetDataset || datasets[0]?.id} onValueChange={setModifyTargetDataset}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {datasets.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* INSERT ROW */}
+            {subConcepts.includes("insert") && (
+              <div className="space-y-3 p-4 border rounded-lg">
+                <Label className="text-base font-semibold">INSERT — Add New Row</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {targetCols.map(col => (
+                    <div key={col.name} className="space-y-1">
+                      <Label className="text-xs">{col.name} ({col.type})</Label>
+                      <Input
+                        placeholder={`Enter ${col.name}`}
+                        value={modifyRowValues[col.name] || ""}
+                        onChange={e => setModifyRowValues(prev => ({ ...prev, [col.name]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" onClick={() => {
+                  if (!targetDs || !onDatasetUpdate) return;
+                  const newRow: Record<string, any> = {};
+                  targetCols.forEach(col => {
+                    const val = modifyRowValues[col.name] || "";
+                    newRow[col.name] = col.type === "number" ? (val ? Number(val) : 0) : val;
+                  });
+                  onDatasetUpdate(targetDs.id, [...targetDs.data, newRow]);
+                  setModifyRowValues({});
+                  toast({ title: "Row inserted", description: "New row added to dataset" });
+                }}>
+                  <Plus className="h-4 w-4 mr-1" /> Insert Row
+                </Button>
+              </div>
+            )}
+
+            {/* UPDATE ROWS */}
+            {subConcepts.includes("update") && (
+              <div className="space-y-3 p-4 border rounded-lg">
+                <Label className="text-base font-semibold">UPDATE — Modify Rows</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Column to update</Label>
+                    <Select value={modifyUpdateColumn} onValueChange={setModifyUpdateColumn}>
+                      <SelectTrigger><SelectValue placeholder="Column" /></SelectTrigger>
+                      <SelectContent>
+                        {targetCols.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">New value</Label>
+                    <Input value={modifyUpdateValue} onChange={e => setModifyUpdateValue(e.target.value)} placeholder="New value" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Where (filter column = value)</Label>
+                    <div className="flex gap-1">
+                      {conditions.length === 0 && (
+                        <Button variant="outline" size="sm" onClick={addCondition}>Add filter</Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {conditions.length > 0 && (
+                  <div className="space-y-2 bg-muted/30 p-2 rounded">
+                    {conditions.map(cond => (
+                      <div key={cond.id} className="flex gap-2 items-center flex-wrap">
+                        <Select value={cond.column} onValueChange={v => updateCondition(cond.id, { column: v })}>
+                          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>{targetCols.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <span className="text-xs">=</span>
+                        <Input value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })} className="w-[140px]" placeholder="Value" />
+                        <Button variant="ghost" size="icon" onClick={() => removeCondition(cond.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button size="sm" onClick={() => {
+                  if (!targetDs || !onDatasetUpdate || !modifyUpdateColumn) return;
+                  const updated = targetDs.data.map(row => {
+                    const match = conditions.length === 0 || conditions.every(c => String(row[c.column]) === String(c.value));
+                    if (match) {
+                      const col = targetCols.find(c => c.name === modifyUpdateColumn);
+                      return { ...row, [modifyUpdateColumn]: col?.type === "number" ? Number(modifyUpdateValue) : modifyUpdateValue };
+                    }
+                    return row;
+                  });
+                  onDatasetUpdate(targetDs.id, updated);
+                  toast({ title: "Rows updated", description: `Updated column "${modifyUpdateColumn}"` });
+                }}>
+                  Apply Update
+                </Button>
+              </div>
+            )}
+
+            {/* DELETE ROWS */}
+            {subConcepts.includes("delete") && (
+              <div className="space-y-3 p-4 border rounded-lg">
+                <Label className="text-base font-semibold">DELETE — Remove Rows</Label>
+                <div className="grid grid-cols-2 gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Where column</Label>
+                    <Select value={modifyDeleteColumn} onValueChange={setModifyDeleteColumn}>
+                      <SelectTrigger><SelectValue placeholder="Column" /></SelectTrigger>
+                      <SelectContent>
+                        {targetCols.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Equals value</Label>
+                    <Input value={modifyDeleteValue} onChange={e => setModifyDeleteValue(e.target.value)} placeholder="Value to match" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" onClick={() => {
+                    if (!targetDs || !onDatasetUpdate || !modifyDeleteColumn) return;
+                    const filtered = targetDs.data.filter(row => String(row[modifyDeleteColumn]) !== String(modifyDeleteValue));
+                    onDatasetUpdate(targetDs.id, filtered);
+                    toast({ title: "Rows deleted", description: `Removed rows where ${modifyDeleteColumn} = ${modifyDeleteValue}` });
+                  }}>
+                    <Trash2 className="h-4 w-4 mr-1" /> Delete Matching Rows
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => {
+                    if (!targetDs || !onDatasetUpdate) return;
+                    onDatasetUpdate(targetDs.id, []);
+                    toast({ title: "All rows deleted (TRUNCATE)", description: "Dataset emptied" });
+                  }}>
+                    Truncate All
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* TRUNCATE */}
+            {subConcepts.includes("truncate") && !subConcepts.includes("delete") && (
+              <div className="space-y-3 p-4 border rounded-lg">
+                <Label className="text-base font-semibold">TRUNCATE — Remove All Rows</Label>
+                <Button size="sm" variant="destructive" onClick={() => {
+                  if (!targetDs || !onDatasetUpdate) return;
+                  onDatasetUpdate(targetDs.id, []);
+                  toast({ title: "Truncated", description: "All rows removed" });
+                }}>
+                  <Trash2 className="h-4 w-4 mr-1" /> Truncate Dataset
+                </Button>
+              </div>
+            )}
+
+            {/* ADD/DROP COLUMN */}
+            <div className="space-y-3 p-4 border rounded-lg">
+              <Label className="text-base font-semibold">ALTER — Add/Drop Columns</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Add Column</Label>
+                  <Input value={modifyNewColName} onChange={e => setModifyNewColName(e.target.value)} placeholder="New column name" />
+                  <Input value={modifyNewColDefault} onChange={e => setModifyNewColDefault(e.target.value)} placeholder="Default value (optional)" />
+                  <Button size="sm" onClick={() => {
+                    if (!targetDs || !onDatasetUpdate || !modifyNewColName.trim()) return;
+                    const newData = targetDs.data.map(row => ({ ...row, [modifyNewColName]: modifyNewColDefault || "" }));
+                    const newCols: ColumnInfo[] = [...targetDs.columns, { name: modifyNewColName, type: "string", sampleValues: [modifyNewColDefault], uniqueCount: 1, nullCount: 0 }];
+                    onDatasetUpdate(targetDs.id, newData, newCols);
+                    setModifyNewColName("");
+                    setModifyNewColDefault("");
+                    toast({ title: "Column added", description: `Added "${modifyNewColName}"` });
+                  }}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Column
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Drop Column</Label>
+                  <Select value={modifyDropColName} onValueChange={setModifyDropColName}>
+                    <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                    <SelectContent>
+                      {targetCols.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="destructive" onClick={() => {
+                    if (!targetDs || !onDatasetUpdate || !modifyDropColName) return;
+                    const newData = targetDs.data.map(row => {
+                      const { [modifyDropColName]: _, ...rest } = row;
+                      return rest;
+                    });
+                    const newCols = targetDs.columns.filter(c => c.name !== modifyDropColName);
+                    onDatasetUpdate(targetDs.id, newData, newCols);
+                    setModifyDropColName("");
+                    toast({ title: "Column dropped", description: `Removed "${modifyDropColName}"` });
+                  }}>
+                    <Trash2 className="h-4 w-4 mr-1" /> Drop Column
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* CREATE TABLE */}
+            <div className="space-y-3 p-4 border rounded-lg">
+              <Label className="text-base font-semibold">CREATE TABLE — New Dataset</Label>
+              <div className="space-y-2">
+                <Input value={modifyNewTableName} onChange={e => setModifyNewTableName(e.target.value)} placeholder="Table name" />
+                <Input value={modifyNewTableCols} onChange={e => setModifyNewTableCols(e.target.value)} placeholder="Columns (comma-separated, e.g.: id, name, age)" />
+                <Button size="sm" onClick={() => {
+                  if (!onDatasetCreate || !modifyNewTableName.trim() || !modifyNewTableCols.trim()) return;
+                  const colNames = modifyNewTableCols.split(",").map(c => c.trim()).filter(Boolean);
+                  const newDs: DatasetInfo = {
+                    id: `ds_${Date.now()}`,
+                    name: modifyNewTableName,
+                    data: [],
+                    columns: colNames.map(name => ({ name, type: "string" as const, sampleValues: [], uniqueCount: 0, nullCount: 0 })),
+                    rowCount: 0,
+                    uploadedAt: new Date().toISOString(),
+                  };
+                  onDatasetCreate(newDs);
+                  setModifyNewTableName("");
+                  setModifyNewTableCols("");
+                  toast({ title: "Table created", description: `Created "${newDs.name}" with ${colNames.length} columns` });
+                }}>
+                  <Plus className="h-4 w-4 mr-1" /> Create Table
+                </Button>
+              </div>
+            </div>
+
+            {/* DROP TABLE */}
+            <div className="space-y-3 p-4 border rounded-lg border-destructive/30">
+              <Label className="text-base font-semibold text-destructive">DROP TABLE — Delete Dataset</Label>
+              <Button size="sm" variant="destructive" onClick={() => {
+                if (!targetDs || !onDatasetDelete) return;
+                onDatasetDelete(targetDs.id);
+                toast({ title: "Table dropped", description: `Deleted "${targetDs.name}"` });
+              }}>
+                <Trash2 className="h-4 w-4 mr-1" /> Drop "{targetDs?.name}"
+              </Button>
+            </div>
           </div>
         );
 

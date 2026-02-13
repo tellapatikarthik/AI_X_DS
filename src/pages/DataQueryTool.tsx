@@ -48,6 +48,20 @@ const DataQueryTool = () => {
     setSelectedDatasets((prev) => prev.filter((sid) => sid !== id));
   };
 
+  const handleDatasetUpdate = (datasetId: string, newData: Record<string, any>[], newColumns?: any[]) => {
+    setDatasets((prev) =>
+      prev.map((d) => {
+        if (d.id !== datasetId) return d;
+        return {
+          ...d,
+          data: newData,
+          rowCount: newData.length,
+          ...(newColumns ? { columns: newColumns } : {}),
+        };
+      })
+    );
+  };
+
   const handleDatasetSelect = (id: string) => {
     setSelectedDatasets((prev) =>
       prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
@@ -223,6 +237,9 @@ const DataQueryTool = () => {
               initialConfig={queryConfig}
               onExecute={handleQueryExecute}
               onConfigChange={setQueryConfig}
+              onDatasetUpdate={handleDatasetUpdate}
+              onDatasetCreate={handleDatasetAdd}
+              onDatasetDelete={handleDatasetRemove}
               isActive={step === 4}
             />
           )}
