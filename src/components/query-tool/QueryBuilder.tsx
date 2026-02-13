@@ -479,10 +479,7 @@ const QueryBuilder = ({
                   <SelectContent>
                     {allColumns.map((col) => (
                       <SelectItem key={col.name} value={col.name}>
-                        {col.name}
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          {col.type}
-                        </Badge>
+                        {col.name} ({col.type})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -602,14 +599,14 @@ const QueryBuilder = ({
             <div className="space-y-2">
               <Label>Group By (Optional)</Label>
               <Select
-                value={groupByColumns[0] || ""}
-                onValueChange={(v) => setGroupByColumns(v ? [v] : [])}
+                value={groupByColumns[0] || "__none__"}
+                onValueChange={(v) => setGroupByColumns(v === "__none__" ? [] : [v])}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select grouping column" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No grouping</SelectItem>
+                  <SelectItem value="__none__">No grouping</SelectItem>
                   {allColumns.map((col) => (
                     <SelectItem key={col.name} value={col.name}>
                       {col.name}
@@ -714,10 +711,7 @@ const QueryBuilder = ({
                 <SelectContent>
                   {allColumns.map((col) => (
                     <SelectItem key={col.name} value={col.name}>
-                      {col.name}
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        {col.type}
-                      </Badge>
+                      {col.name} ({col.type})
                     </SelectItem>
                   ))}
                 </SelectContent>
