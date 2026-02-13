@@ -29,7 +29,8 @@ export interface QueryConfig {
   name?: string;
   datasetIds: string[];
   concept: string;
-  subConcept: string;
+  subConcept: string; // kept for backward compat
+  subConcepts: string[];
   columns: string[];
   conditions: QueryCondition[];
   conditionLogic?: "and" | "or"; // Logical operator between conditions

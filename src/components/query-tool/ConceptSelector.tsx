@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,9 +40,10 @@ import { CONCEPTS, DatasetInfo } from "@/types/queryTool";
 
 interface ConceptSelectorProps {
   selectedConcept: string | null;
-  selectedSubConcept: string | null;
+  selectedSubConcepts: string[];
   onConceptSelect: (concept: string) => void;
-  onSubConceptSelect: (subConcept: string) => void;
+  onSubConceptToggle: (subConcept: string) => void;
+  onSubConceptsProceed: () => void;
   datasets: DatasetInfo[];
   isActive: boolean;
 }
@@ -75,9 +77,10 @@ const iconMap: Record<string, any> = {
 
 const ConceptSelector = ({
   selectedConcept,
-  selectedSubConcept,
+  selectedSubConcepts,
   onConceptSelect,
-  onSubConceptSelect,
+  onSubConceptToggle,
+  onSubConceptsProceed,
   datasets,
   isActive,
 }: ConceptSelectorProps) => {
@@ -243,13 +246,13 @@ const ConceptSelector = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {currentConcept.subConcepts.map((sub) => {
                 const available = isSubConceptAvailable(sub);
-                const isSelected = selectedSubConcept === sub.id;
+                const isSelected = selectedSubConcepts.includes(sub.id);
 
                 return (
                   <Tooltip key={sub.id}>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => available && onSubConceptSelect(sub.id)}
+                        onClick={() => available && onSubConceptToggle(sub.id)}
                         disabled={!available}
                         className={`p-4 rounded-lg border text-left transition-all ${
                           isSelected
@@ -292,6 +295,19 @@ const ConceptSelector = ({
                 );
               })}
             </div>
+
+            {selectedSubConcepts.length > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <p className="text-sm text-muted-foreground">
+                  <Badge variant="default" className="mr-2">{selectedSubConcepts.length}</Badge>
+                  sub-concept{selectedSubConcepts.length > 1 ? "s" : ""} selected
+                </p>
+                <Button onClick={onSubConceptsProceed} className="gap-2">
+                  <ChevronRight className="h-4 w-4" />
+                  Configure Query
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

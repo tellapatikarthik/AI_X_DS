@@ -15,7 +15,7 @@ const DataQueryTool = () => {
   const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [selectedConcept, setSelectedConcept] = useState<string | null>(null);
-  const [selectedSubConcept, setSelectedSubConcept] = useState<string | null>(null);
+  const [selectedSubConcepts, setSelectedSubConcepts] = useState<string[]>([]);
   const [queryConfig, setQueryConfig] = useState<QueryConfig | null>(null);
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
   const [step, setStep] = useState<number>(1);
@@ -56,15 +56,24 @@ const DataQueryTool = () => {
 
   const handleConceptSelect = (concept: string) => {
     setSelectedConcept(concept);
-    setSelectedSubConcept(null);
+    setSelectedSubConcepts([]);
     setQueryConfig(null);
     setQueryResult(null);
     setStep(3);
   };
 
-  const handleSubConceptSelect = (subConcept: string) => {
-    setSelectedSubConcept(subConcept);
-    setStep(4);
+  const handleSubConceptToggle = (subConcept: string) => {
+    setSelectedSubConcepts((prev) => {
+      const updated = prev.includes(subConcept)
+        ? prev.filter((s) => s !== subConcept)
+        : [...prev, subConcept];
+      if (updated.length > 0) setStep(4);
+      return updated;
+    });
+  };
+
+  const handleSubConceptsProceed = () => {
+    if (selectedSubConcepts.length > 0) setStep(4);
   };
 
   const handleQueryExecute = (result: QueryResult) => {
@@ -75,14 +84,14 @@ const DataQueryTool = () => {
   const handleSavedQueryLoad = (config: QueryConfig) => {
     setSelectedDatasets(config.datasetIds);
     setSelectedConcept(config.concept);
-    setSelectedSubConcept(config.subConcept);
+    setSelectedSubConcepts(config.subConcepts || [config.subConcept]);
     setQueryConfig(config);
     setStep(4);
   };
 
   const resetQuery = () => {
     setSelectedConcept(null);
-    setSelectedSubConcept(null);
+    setSelectedSubConcepts([]);
     setQueryConfig(null);
     setQueryResult(null);
     setStep(selectedDatasets.length > 0 ? 2 : 1);
@@ -196,20 +205,21 @@ const DataQueryTool = () => {
           {step >= 2 && selectedDatasets.length > 0 && (
             <ConceptSelector
               selectedConcept={selectedConcept}
-              selectedSubConcept={selectedSubConcept}
+              selectedSubConcepts={selectedSubConcepts}
               onConceptSelect={handleConceptSelect}
-              onSubConceptSelect={handleSubConceptSelect}
+              onSubConceptToggle={handleSubConceptToggle}
+              onSubConceptsProceed={handleSubConceptsProceed}
               datasets={datasets.filter((d) => selectedDatasets.includes(d.id))}
               isActive={step === 2 || step === 3}
             />
           )}
 
           {/* Step 4: Query Builder */}
-          {step >= 4 && selectedConcept && selectedSubConcept && (
+          {step >= 4 && selectedConcept && selectedSubConcepts.length > 0 && (
             <QueryBuilder
               datasets={datasets.filter((d) => selectedDatasets.includes(d.id))}
               concept={selectedConcept}
-              subConcept={selectedSubConcept}
+              subConcepts={selectedSubConcepts}
               initialConfig={queryConfig}
               onExecute={handleQueryExecute}
               onConfigChange={setQueryConfig}

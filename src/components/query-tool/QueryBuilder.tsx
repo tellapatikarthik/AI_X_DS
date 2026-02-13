@@ -41,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 interface QueryBuilderProps {
   datasets: DatasetInfo[];
   concept: string;
-  subConcept: string;
+  subConcepts: string[];
   initialConfig: QueryConfig | null;
   onExecute: (result: QueryResult) => void;
   onConfigChange: (config: QueryConfig) => void;
@@ -80,7 +80,7 @@ const AGGREGATIONS: { value: AggregationFunction; label: string }[] = [
 const QueryBuilder = ({
   datasets,
   concept,
-  subConcept,
+  subConcepts,
   initialConfig,
   onExecute,
   onConfigChange,
@@ -126,7 +126,7 @@ const QueryBuilder = ({
     return datasets[0]?.data || [];
   }, [datasets]);
 
-  // Initialize based on concept/subConcept
+  // Initialize based on concept/subConcepts
   useEffect(() => {
     if (initialConfig) {
       setSelectedColumns(initialConfig.columns || []);
@@ -140,17 +140,24 @@ const QueryBuilder = ({
       return;
     }
 
-    // Auto-select columns based on concept
+    // Auto-select based on all selected sub-concepts
     if (concept === "aggregate" && numericColumns.length > 0) {
-      setAggregations([{ column: numericColumns[0].name, function: subConcept as AggregationFunction }]);
+      const aggs = subConcepts
+        .filter((sc) => ["sum", "average", "count", "count_distinct", "min", "max", "median", "mode", "variance", "stddev"].includes(sc))
+        .map((sc) => ({
+          column: numericColumns[0].name,
+          function: sc as AggregationFunction,
+        }));
+      if (aggs.length > 0) setAggregations(aggs);
     }
     if (concept === "sort") {
-      setSortConfig([{
+      const configs = subConcepts.map((sc) => ({
         column: allColumns[0]?.name || "",
-        direction: subConcept === "ascending" ? "asc" : "desc",
-      }]);
+        direction: (sc === "ascending" ? "asc" : "desc") as "asc" | "desc",
+      }));
+      if (configs.length > 0) setSortConfig(configs);
     }
-  }, [concept, subConcept, initialConfig]);
+  }, [concept, subConcepts, initialConfig]);
 
   const addCondition = () => {
     const newCondition: QueryCondition = {
@@ -376,7 +383,8 @@ const QueryBuilder = ({
       const config: QueryConfig = {
         datasetIds: datasets.map((d) => d.id),
         concept,
-        subConcept,
+        subConcept: subConcepts[0] || "",
+        subConcepts,
         columns: selectedColumns,
         conditions,
         conditionLogic,
@@ -591,73 +599,102 @@ const QueryBuilder = ({
       case "aggregate":
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Group By (Optional)</Label>
-                <Select
-                  value={groupByColumns[0] || ""}
-                  onValueChange={(v) => setGroupByColumns(v ? [v] : [])}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select grouping column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No grouping</SelectItem>
-                    {allColumns.map((col) => (
-                      <SelectItem key={col.name} value={col.name}>
-                        {col.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Group By (Optional)</Label>
+              <Select
+                value={groupByColumns[0] || ""}
+                onValueChange={(v) => setGroupByColumns(v ? [v] : [])}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select grouping column" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No grouping</SelectItem>
+                  {allColumns.map((col) => (
+                    <SelectItem key={col.name} value={col.name}>
+                      {col.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-2">
-                <Label>Aggregation</Label>
-                <div className="flex gap-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Aggregations ({aggregations.length} selected)</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAggregations([...aggregations, {
+                      column: numericColumns[0]?.name || allColumns[0]?.name || "",
+                      function: "sum" as AggregationFunction,
+                    }]);
+                  }}
+                  className="gap-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Aggregation
+                </Button>
+              </div>
+              {aggregations.map((agg, index) => (
+                <div key={index} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
                   <Select
-                    value={aggregations[0]?.function || subConcept}
+                    value={agg.function}
                     onValueChange={(v) => {
-                      setAggregations([{
-                        column: aggregations[0]?.column || numericColumns[0]?.name || "",
-                        function: v as AggregationFunction,
-                      }]);
+                      const updated = [...aggregations];
+                      updated[index] = { ...agg, function: v as AggregationFunction };
+                      setAggregations(updated);
                     }}
                   >
-                    <SelectTrigger className="w-[120px]">
+                    <SelectTrigger className="w-[140px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {AGGREGATIONS.map((agg) => (
-                        <SelectItem key={agg.value} value={agg.value}>
-                          {agg.label}
+                      {AGGREGATIONS.map((a) => (
+                        <SelectItem key={a.value} value={a.value}>
+                          {a.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
 
+                  <span className="text-muted-foreground text-sm">of</span>
+
                   <Select
-                    value={aggregations[0]?.column || ""}
+                    value={agg.column}
                     onValueChange={(v) => {
-                      setAggregations([{
-                        column: v,
-                        function: aggregations[0]?.function || (subConcept as AggregationFunction),
-                      }]);
+                      const updated = [...aggregations];
+                      updated[index] = { ...agg, column: v };
+                      setAggregations(updated);
                     }}
                   >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Select column" />
                     </SelectTrigger>
                     <SelectContent>
-                      {numericColumns.map((col) => (
+                      {(agg.function === "count" || agg.function === "count_distinct"
+                        ? allColumns
+                        : numericColumns.length > 0 ? numericColumns : allColumns
+                      ).map((col) => (
                         <SelectItem key={col.name} value={col.name}>
                           {col.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setAggregations(aggregations.filter((_, i) => i !== index))}
+                    className="text-muted-foreground hover:text-destructive"
+                    disabled={aggregations.length <= 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         );
