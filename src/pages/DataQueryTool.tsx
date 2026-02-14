@@ -6,10 +6,10 @@ import { Link } from "react-router-dom";
 import DatasetManager from "@/components/query-tool/DatasetManager";
 import ConceptSelector from "@/components/query-tool/ConceptSelector";
 import QueryBuilder from "@/components/query-tool/QueryBuilder";
-import ResultsViewer from "@/components/query-tool/ResultsViewer";
+import ResultsViewer, { NamedResult } from "@/components/query-tool/ResultsViewer";
 import SavedQueries from "@/components/query-tool/SavedQueries";
 import { ParsedDataset } from "@/lib/datasetParser";
-import { QueryConfig, QueryResult, DatasetInfo } from "@/types/queryTool";
+import { QueryConfig, QueryResult, DatasetInfo, CONCEPTS } from "@/types/queryTool";
 
 const DataQueryTool = () => {
   const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
@@ -17,7 +17,7 @@ const DataQueryTool = () => {
   const [selectedConcept, setSelectedConcept] = useState<string | null>(null);
   const [selectedSubConcepts, setSelectedSubConcepts] = useState<string[]>([]);
   const [queryConfig, setQueryConfig] = useState<QueryConfig | null>(null);
-  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
+  const [queryResults, setQueryResults] = useState<NamedResult[]>([]);
   const [step, setStep] = useState<number>(1);
 
   // Load saved datasets from sessionStorage
@@ -72,7 +72,6 @@ const DataQueryTool = () => {
     setSelectedConcept(concept);
     setSelectedSubConcepts([]);
     setQueryConfig(null);
-    setQueryResult(null);
     setStep(3);
   };
 
@@ -91,7 +90,12 @@ const DataQueryTool = () => {
   };
 
   const handleQueryExecute = (result: QueryResult) => {
-    setQueryResult(result);
+    // Get concept label
+    const conceptDef = CONCEPTS.find((c) => c.id === selectedConcept);
+    const label = conceptDef?.name || selectedConcept || "Query";
+
+    // Append to results list so user can accumulate multiple tables
+    setQueryResults((prev) => [...prev, { label, result }]);
     setStep(5);
   };
 
@@ -107,8 +111,15 @@ const DataQueryTool = () => {
     setSelectedConcept(null);
     setSelectedSubConcepts([]);
     setQueryConfig(null);
-    setQueryResult(null);
+    setQueryResults([]);
     setStep(selectedDatasets.length > 0 ? 2 : 1);
+  };
+
+  const addAnotherQuery = () => {
+    setSelectedConcept(null);
+    setSelectedSubConcepts([]);
+    setQueryConfig(null);
+    setStep(2);
   };
 
   const getStepTitle = () => {
@@ -197,11 +208,18 @@ const DataQueryTool = () => {
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">{getStepTitle()}</h2>
-            {step > 1 && (
-              <Button variant="outline" size="sm" onClick={resetQuery}>
-                Start Over
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {step === 5 && (
+                <Button variant="default" size="sm" onClick={addAnotherQuery} className="gap-1">
+                  + Add Another Query
+                </Button>
+              )}
+              {step > 1 && (
+                <Button variant="outline" size="sm" onClick={resetQuery}>
+                  Start Over
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Step 1: Dataset Manager */}
@@ -244,11 +262,11 @@ const DataQueryTool = () => {
             />
           )}
 
-          {/* Step 5: Results Viewer */}
-          {step === 5 && queryResult && queryConfig && (
+          {/* Step 5: Results Viewer - shows all accumulated result tables */}
+          {queryResults.length > 0 && (
             <ResultsViewer
-              result={queryResult}
-              config={queryConfig}
+              results={queryResults}
+              config={queryConfig || { datasetIds: [], concept: "", subConcept: "", subConcepts: [], columns: [], conditions: [] }}
               datasets={datasets.filter((d) => selectedDatasets.includes(d.id))}
             />
           )}

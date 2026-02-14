@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
@@ -14,6 +15,7 @@ import {
   FileSpreadsheet,
   Database,
   Trash2,
+  Plus,
   Check,
   X,
   Info,
@@ -114,6 +116,196 @@ const detectRelationships = (
   }
 
   return relationships;
+};
+
+const CreateTableCard = ({ onDatasetAdd }: { onDatasetAdd: (dataset: DatasetInfo) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [tableName, setTableName] = useState("");
+  const [columns, setColumns] = useState<{ name: string; type: ColumnInfo["type"] }[]>([
+    { name: "", type: "string" },
+  ]);
+  const [rows, setRows] = useState<Record<string, string>[]>([]);
+  const { toast } = useToast();
+
+  const addColumn = () => setColumns([...columns, { name: "", type: "string" }]);
+  const removeColumn = (i: number) => {
+    const removed = columns[i].name;
+    setColumns(columns.filter((_, idx) => idx !== i));
+    setRows(rows.map((r) => { const { [removed]: _, ...rest } = r; return rest; }));
+  };
+  const updateColumn = (i: number, field: "name" | "type", value: string) => {
+    const updated = [...columns];
+    if (field === "name") {
+      const oldName = updated[i].name;
+      updated[i] = { ...updated[i], name: value };
+      setRows(rows.map((r) => {
+        const { [oldName]: val, ...rest } = r;
+        return { ...rest, [value]: val || "" };
+      }));
+    } else {
+      updated[i] = { ...updated[i], type: value as ColumnInfo["type"] };
+    }
+    setColumns(updated);
+  };
+
+  const addRow = () => {
+    const empty: Record<string, string> = {};
+    columns.forEach((c) => { if (c.name) empty[c.name] = ""; });
+    setRows([...rows, empty]);
+  };
+  const updateCell = (rowIdx: number, col: string, value: string) => {
+    const updated = [...rows];
+    updated[rowIdx] = { ...updated[rowIdx], [col]: value };
+    setRows(updated);
+  };
+  const removeRow = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
+
+  const handleCreate = () => {
+    const validCols = columns.filter((c) => c.name.trim());
+    if (!tableName.trim() || validCols.length === 0) {
+      toast({ variant: "destructive", title: "Error", description: "Provide a table name and at least one column" });
+      return;
+    }
+    const data = rows.map((r) => {
+      const row: Record<string, any> = {};
+      validCols.forEach((c) => {
+        const val = r[c.name] || "";
+        row[c.name] = c.type === "number" ? (val ? Number(val) : 0) : val;
+      });
+      return row;
+    });
+    const ds: DatasetInfo = {
+      id: `ds_${Date.now()}`,
+      name: tableName,
+      data,
+      columns: validCols.map((c) => ({
+        name: c.name,
+        type: c.type,
+        sampleValues: data.slice(0, 5).map((r) => r[c.name]),
+        uniqueCount: new Set(data.map((r) => r[c.name])).size,
+        nullCount: 0,
+      })),
+      rowCount: data.length,
+      uploadedAt: new Date().toISOString(),
+    };
+    onDatasetAdd(ds);
+    toast({ title: "Table created", description: `"${tableName}" with ${validCols.length} columns and ${data.length} rows` });
+    setTableName("");
+    setColumns([{ name: "", type: "string" }]);
+    setRows([]);
+    setIsOpen(false);
+  };
+
+  const validCols = columns.filter((c) => c.name.trim());
+
+  return (
+    <div className="border-2 border-dashed rounded-lg p-4 space-y-3">
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-2">
+          <Plus className="h-5 w-5 text-primary" />
+          <span className="font-medium">Create a New Table</span>
+        </div>
+        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
+      </div>
+
+      {isOpen && (
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1">
+            <Label className="text-xs font-medium">Table Name</Label>
+            <Input value={tableName} onChange={(e) => setTableName(e.target.value)} placeholder="e.g., students, sales_data" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium">Columns</Label>
+              <Button variant="outline" size="sm" onClick={addColumn} className="gap-1 h-7">
+                <Plus className="h-3 w-3" /> Add Column
+              </Button>
+            </div>
+            {columns.map((col, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  value={col.name}
+                  onChange={(e) => updateColumn(i, "name", e.target.value)}
+                  placeholder="Column name"
+                  className="flex-1"
+                />
+                <select
+                  value={col.type}
+                  onChange={(e) => updateColumn(i, "type", e.target.value)}
+                  className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="string">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="boolean">Boolean</option>
+                </select>
+                {columns.length > 1 && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeColumn(i)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {validCols.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium">Data Rows ({rows.length})</Label>
+                <Button variant="outline" size="sm" onClick={addRow} className="gap-1 h-7">
+                  <Plus className="h-3 w-3" /> Add Row
+                </Button>
+              </div>
+              {rows.length > 0 && (
+                <ScrollArea className="max-h-[200px] border rounded-md">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        {validCols.map((c) => (
+                          <th key={c.name} className="px-2 py-1.5 text-left font-medium text-xs">{c.name}</th>
+                        ))}
+                        <th className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, ri) => (
+                        <tr key={ri} className="border-t">
+                          {validCols.map((c) => (
+                            <td key={c.name} className="px-1 py-1">
+                              <Input
+                                value={row[c.name] || ""}
+                                onChange={(e) => updateCell(ri, c.name, e.target.value)}
+                                className="h-7 text-xs"
+                                placeholder={c.type}
+                              />
+                            </td>
+                          ))}
+                          <td className="px-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRow(ri)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              )}
+            </div>
+          )}
+
+          <Button onClick={handleCreate} className="w-full gap-2">
+            <Database className="h-4 w-4" />
+            Create Table
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const DatasetManager = ({
@@ -387,6 +579,9 @@ const DatasetManager = ({
             <p className="text-sm">Upload your data files to get started</p>
           </div>
         )}
+
+        {/* Create Table Card */}
+        <CreateTableCard onDatasetAdd={onDatasetAdd} />
       </CardContent>
     </Card>
   );
