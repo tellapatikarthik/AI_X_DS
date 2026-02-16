@@ -63,13 +63,28 @@ export const DashboardCanvas = ({
               </Button>
             </div>
           </div>
-          <div className={viz.chartType === "worldmap" ? "h-[400px]" : "h-[250px]"}>
+          <div
+            className="overflow-auto"
+            style={{
+              height: viz.chartType === "worldmap"
+                ? 400
+                : ["pie", "donut", "funnel", "radar"].includes(viz.chartType)
+                  ? Math.max(300, Math.min(data.length * 22 + 120, 600))
+                  : Math.max(250, Math.min(data.length * 6 + 100, 500)),
+            }}
+          >
             <ChartRenderer
               type={viz.chartType}
               data={data}
               xAxis={viz.xAxis}
               yAxis={viz.yAxis}
-              height={viz.chartType === "worldmap" ? 400 : 250}
+              height={
+                viz.chartType === "worldmap"
+                  ? 400
+                  : ["pie", "donut", "funnel", "radar"].includes(viz.chartType)
+                    ? Math.max(300, Math.min(data.length * 22 + 120, 600))
+                    : Math.max(250, Math.min(data.length * 6 + 100, 500))
+              }
             />
           </div>
         </Card>
