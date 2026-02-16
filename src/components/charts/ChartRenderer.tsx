@@ -49,6 +49,62 @@ interface ChartRendererProps {
   height?: number;
 }
 
+/**
+ * Power BI-style aggregation: groups by xAxis key.
+ * - Numeric yAxis values → SUM
+ * - String yAxis values → COUNT (distinct)
+ * Skips aggregation for scatter charts or when data is already small enough.
+ */
+const aggregateData = (
+  raw: any[],
+  xKey: string,
+  yKey: string,
+  chartType: ChartType
+): any[] => {
+  // Skip aggregation for scatter (needs raw points) and maps
+  if (chartType === "scatter" || chartType === "worldmap" || chartType === "gauge") return raw;
+
+  // Check if yAxis values are numeric
+  const isNumeric = raw.some((r) => typeof r[yKey] === "number" && !isNaN(r[yKey]));
+  const isYString = !isNumeric;
+
+  // Count distinct xAxis values
+  const distinctX = new Set(raw.map((r) => String(r[xKey] ?? "").trim().toLowerCase())).size;
+
+  // Only aggregate when distinct categories > threshold or data is large
+  const THRESHOLD = 20;
+  if (distinctX <= THRESHOLD && raw.length <= THRESHOLD) return raw;
+
+  // Group by xAxis (case-insensitive)
+  const groups = new Map<string, { displayName: string; rows: any[] }>();
+  for (const row of raw) {
+    const rawKey = String(row[xKey] ?? "");
+    const normKey = rawKey.trim().toLowerCase();
+    if (!groups.has(normKey)) {
+      groups.set(normKey, { displayName: rawKey, rows: [] });
+    }
+    groups.get(normKey)!.rows.push(row);
+  }
+
+  // Aggregate
+  const aggregated: any[] = [];
+  for (const [, { displayName, rows }] of groups) {
+    if (isYString) {
+      // COUNT of rows per group (like Power BI does for text columns)
+      aggregated.push({ [xKey]: displayName, [yKey]: rows.length });
+    } else {
+      // SUM numeric values (Power BI default for numbers)
+      const sum = rows.reduce((acc, r) => acc + (Number(r[yKey]) || 0), 0);
+      aggregated.push({ [xKey]: displayName, [yKey]: parseFloat(sum.toFixed(2)) });
+    }
+  }
+
+  // Sort descending by value for better visuals
+  aggregated.sort((a, b) => (Number(b[yKey]) || 0) - (Number(a[yKey]) || 0));
+
+  return aggregated;
+};
+
 export const ChartRenderer = ({
   type,
   data,
@@ -64,14 +120,21 @@ export const ChartRenderer = ({
     );
   }
 
+  // Determine keys
+  const xKey = xAxis || Object.keys(data[0])[0];
+  const yKey = yAxis || Object.keys(data[0])[1];
+
+  // Apply Power BI-style aggregation
+  const chartData = aggregateData(data, xKey, yKey, type);
+
   const renderChart = () => {
     switch (type) {
       case "bar":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={data}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey={xAxis} stroke="hsl(var(--muted-foreground))" fontSize={12} interval={0} angle={data.length > 10 ? -45 : 0} textAnchor={data.length > 10 ? "end" : "middle"} height={data.length > 10 ? 80 : 30} />
+              <XAxis dataKey={xKey} stroke="hsl(var(--muted-foreground))" fontSize={12} interval={0} angle={chartData.length > 10 ? -45 : 0} textAnchor={chartData.length > 10 ? "end" : "middle"} height={chartData.length > 10 ? 80 : 30} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
@@ -81,7 +144,7 @@ export const ChartRenderer = ({
                 }}
               />
               <Legend />
-              <Bar dataKey={yAxis || Object.keys(data[0])[1]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
+              <Bar dataKey={yKey} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -89,9 +152,9 @@ export const ChartRenderer = ({
       case "line":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <LineChart data={data}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey={xAxis} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={xKey} stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
@@ -103,7 +166,7 @@ export const ChartRenderer = ({
               <Legend />
               <Line
                 type="monotone"
-                dataKey={yAxis || Object.keys(data[0])[1]}
+                dataKey={yKey}
                 stroke={COLORS[0]}
                 strokeWidth={2}
                 dot={{ fill: COLORS[0] }}
@@ -115,9 +178,9 @@ export const ChartRenderer = ({
       case "area":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <AreaChart data={data}>
+            <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey={xAxis} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={xKey} stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
@@ -129,7 +192,7 @@ export const ChartRenderer = ({
               <Legend />
               <Area
                 type="monotone"
-                dataKey={yAxis || Object.keys(data[0])[1]}
+                dataKey={yKey}
                 stroke={COLORS[0]}
                 fill={COLORS[0]}
                 fillOpacity={0.3}
@@ -140,9 +203,9 @@ export const ChartRenderer = ({
 
       case "pie":
       case "donut":
-        const pieData = data.map((item, index) => ({
-          name: item[xAxis || Object.keys(item)[0]],
-          value: Number(item[yAxis || Object.keys(item)[1]]) || 0,
+        const pieData = chartData.map((item) => ({
+          name: item[xKey],
+          value: Number(item[yKey]) || 0,
         }));
         const pieRadius = Math.min(80, Math.max(40, 150 - pieData.length * 2));
         return (
@@ -186,13 +249,13 @@ export const ChartRenderer = ({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 type="number"
-                dataKey={xAxis || Object.keys(data[0])[0]}
+                dataKey={xKey}
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
               />
               <YAxis
                 type="number"
-                dataKey={yAxis || Object.keys(data[0])[1]}
+                dataKey={yKey}
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
               />
@@ -203,7 +266,7 @@ export const ChartRenderer = ({
                   borderRadius: "8px",
                 }}
               />
-              <Scatter data={data} fill={COLORS[0]} />
+              <Scatter data={chartData} fill={COLORS[0]} />
             </ScatterChart>
           </ResponsiveContainer>
         );
@@ -211,12 +274,12 @@ export const ChartRenderer = ({
       case "radar":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <RadarChart data={data}>
+            <RadarChart data={chartData}>
               <PolarGrid stroke="hsl(var(--border))" />
-              <PolarAngleAxis dataKey={xAxis || Object.keys(data[0])[0]} stroke="hsl(var(--muted-foreground))" />
+              <PolarAngleAxis dataKey={xKey} stroke="hsl(var(--muted-foreground))" />
               <PolarRadiusAxis stroke="hsl(var(--muted-foreground))" />
               <Radar
-                dataKey={yAxis || Object.keys(data[0])[1]}
+                dataKey={yKey}
                 stroke={COLORS[0]}
                 fill={COLORS[0]}
                 fillOpacity={0.5}
@@ -233,9 +296,9 @@ export const ChartRenderer = ({
         );
 
       case "treemap":
-        const treemapData = data.map((item, index) => ({
-          name: item[xAxis || Object.keys(item)[0]],
-          size: Number(item[yAxis || Object.keys(item)[1]]) || 0,
+        const treemapData = chartData.map((item, index) => ({
+          name: item[xKey],
+          size: Number(item[yKey]) || 0,
           fill: COLORS[index % COLORS.length],
         }));
         return (
@@ -251,9 +314,9 @@ export const ChartRenderer = ({
         );
 
       case "funnel":
-        const funnelData = data.map((item, index) => ({
-          name: item[xAxis || Object.keys(item)[0]],
-          value: Number(item[yAxis || Object.keys(item)[1]]) || 0,
+        const funnelData = chartData.map((item, index) => ({
+          name: item[xKey],
+          value: Number(item[yKey]) || 0,
           fill: COLORS[index % COLORS.length],
         }));
         return (
@@ -274,7 +337,7 @@ export const ChartRenderer = ({
         );
 
       case "gauge":
-        const gaugeValue = Number(data[0]?.[yAxis || Object.keys(data[0])[1]]) || 0;
+        const gaugeValue = Number(chartData[0]?.[yKey]) || 0;
         const gaugeData = [
           { name: "value", value: gaugeValue, fill: COLORS[0] },
           { name: "rest", value: 100 - gaugeValue, fill: "hsl(var(--muted))" },
@@ -312,9 +375,9 @@ export const ChartRenderer = ({
       case "worldmap":
         return (
           <MapRenderer
-            data={data}
-            xAxis={xAxis}
-            yAxis={yAxis}
+            data={chartData}
+            xAxis={xKey}
+            yAxis={yKey}
             height={height}
           />
         );
