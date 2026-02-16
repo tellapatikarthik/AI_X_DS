@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Layers,
   CircleDot,
+  Globe,
   type LucideIcon
 } from "lucide-react";
 
@@ -22,7 +23,8 @@ export type ChartType =
   | "radar" 
   | "treemap" 
   | "funnel" 
-  | "gauge";
+  | "gauge"
+  | "worldmap";
 
 interface ChartIconProps {
   type: ChartType;
@@ -40,6 +42,7 @@ const chartIcons: Record<ChartType, LucideIcon> = {
   treemap: Layers,
   funnel: TrendingUp,
   gauge: CircleDot,
+  worldmap: Globe,
 };
 
 const chartLabels: Record<ChartType, string> = {
@@ -53,6 +56,7 @@ const chartLabels: Record<ChartType, string> = {
   treemap: "Treemap",
   funnel: "Funnel Chart",
   gauge: "Gauge",
+  worldmap: "World Map",
 };
 
 export const ChartIcon = ({ type, className }: ChartIconProps) => {
@@ -73,4 +77,5 @@ export const chartTypes: ChartType[] = [
   "treemap",
   "funnel",
   "gauge",
+  "worldmap",
 ];
