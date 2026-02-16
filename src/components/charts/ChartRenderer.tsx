@@ -71,7 +71,7 @@ export const ChartRenderer = ({
           <ResponsiveContainer width="100%" height={height}>
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey={xAxis} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={xAxis} stroke="hsl(var(--muted-foreground))" fontSize={12} interval={0} angle={data.length > 10 ? -45 : 0} textAnchor={data.length > 10 ? "end" : "middle"} height={data.length > 10 ? 80 : 30} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
@@ -144,18 +144,19 @@ export const ChartRenderer = ({
           name: item[xAxis || Object.keys(item)[0]],
           value: Number(item[yAxis || Object.keys(item)[1]]) || 0,
         }));
+        const pieRadius = Math.min(80, Math.max(40, 150 - pieData.length * 2));
         return (
           <ResponsiveContainer width="100%" height={height}>
             <PieChart>
               <Pie
                 data={pieData}
                 cx="50%"
-                cy="50%"
-                innerRadius={type === "donut" ? 60 : 0}
-                outerRadius={80}
+                cy="40%"
+                innerRadius={type === "donut" ? pieRadius * 0.7 : 0}
+                outerRadius={pieRadius}
                 paddingAngle={2}
                 dataKey="value"
-                label
+                label={pieData.length <= 15}
               >
                 {pieData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -168,7 +169,12 @@ export const ChartRenderer = ({
                   borderRadius: "8px",
                 }}
               />
-              <Legend />
+              <Legend
+                layout="vertical"
+                align="right"
+                verticalAlign="middle"
+                wrapperStyle={{ maxHeight: height - 40, overflowY: "auto", fontSize: 12 }}
+              />
             </PieChart>
           </ResponsiveContainer>
         );
