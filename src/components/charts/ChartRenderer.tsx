@@ -27,6 +27,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { ChartType } from "./ChartIcon";
+import { MapRenderer } from "./MapRenderer";
 
 const COLORS = [
   "hsl(245, 60%, 55%)",
@@ -300,6 +301,16 @@ export const ChartRenderer = ({
               </text>
             </PieChart>
           </ResponsiveContainer>
+        );
+
+      case "worldmap":
+        return (
+          <MapRenderer
+            data={data}
+            xAxis={xAxis}
+            yAxis={yAxis}
+            height={height}
+          />
         );
 
       default:

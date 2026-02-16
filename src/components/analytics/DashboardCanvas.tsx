@@ -31,11 +31,13 @@ export const DashboardCanvas = ({
   }
 
   return (
-    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-min">
+    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-min overflow-auto max-h-[calc(100vh-200px)]">
       {visualizations.map((viz) => (
         <Card
           key={viz.id}
-          className="p-4 border-0 shadow-md hover:shadow-lg transition-all group"
+          className={`p-4 border-0 shadow-md hover:shadow-lg transition-all group ${
+            viz.chartType === "worldmap" ? "md:col-span-2" : ""
+          }`}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -61,13 +63,13 @@ export const DashboardCanvas = ({
               </Button>
             </div>
           </div>
-          <div className="h-[250px]">
+          <div className={viz.chartType === "worldmap" ? "h-[400px]" : "h-[250px]"}>
             <ChartRenderer
               type={viz.chartType}
               data={data}
               xAxis={viz.xAxis}
               yAxis={viz.yAxis}
-              height={250}
+              height={viz.chartType === "worldmap" ? 400 : 250}
             />
           </div>
         </Card>
