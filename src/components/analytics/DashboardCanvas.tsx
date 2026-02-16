@@ -30,65 +30,62 @@ export const DashboardCanvas = ({
     );
   }
 
+  const getChartHeight = (chartType: string, rowCount: number) => {
+    if (chartType === "worldmap") return 400;
+    if (["pie", "donut", "funnel", "radar"].includes(chartType))
+      return Math.max(300, Math.min(rowCount * 22 + 120, 600));
+    return Math.max(280, Math.min(rowCount * 6 + 100, 500));
+  };
+
   return (
-    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-min overflow-auto max-h-[calc(100vh-200px)]">
-      {visualizations.map((viz) => (
-        <Card
-          key={viz.id}
-          className={`p-4 border-0 shadow-md hover:shadow-lg transition-all group ${
-            viz.chartType === "worldmap" ? "md:col-span-2" : ""
-          }`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
+    <div className="flex-1 overflow-y-auto max-h-[calc(100vh-180px)] pr-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-min">
+        {visualizations.map((viz) => {
+          const h = getChartHeight(viz.chartType, data.length);
+          return (
+            <Card
+              key={viz.id}
+              className={`p-4 border-0 shadow-md hover:shadow-lg transition-all group ${
+                viz.chartType === "worldmap" ? "md:col-span-2" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="h-8 w-8 rounded bg-gradient-primary flex items-center justify-center">
+                    <ChartIcon type={viz.chartType} className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                  <h4 className="font-semibold">{viz.title}</h4>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={() => onRemove(viz.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="h-8 w-8 rounded bg-gradient-primary flex items-center justify-center">
-                <ChartIcon type={viz.chartType} className="h-4 w-4 text-primary-foreground" />
+              <div style={{ width: "100%", height: `${h}px` }}>
+                <ChartRenderer
+                  type={viz.chartType}
+                  data={data}
+                  xAxis={viz.xAxis}
+                  yAxis={viz.yAxis}
+                  height={h}
+                />
               </div>
-              <h4 className="font-semibold">{viz.title}</h4>
-            </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => onRemove(viz.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div
-            className="overflow-auto"
-            style={{
-              height: viz.chartType === "worldmap"
-                ? 400
-                : ["pie", "donut", "funnel", "radar"].includes(viz.chartType)
-                  ? Math.max(300, Math.min(data.length * 22 + 120, 600))
-                  : Math.max(250, Math.min(data.length * 6 + 100, 500)),
-            }}
-          >
-            <ChartRenderer
-              type={viz.chartType}
-              data={data}
-              xAxis={viz.xAxis}
-              yAxis={viz.yAxis}
-              height={
-                viz.chartType === "worldmap"
-                  ? 400
-                  : ["pie", "donut", "funnel", "radar"].includes(viz.chartType)
-                    ? Math.max(300, Math.min(data.length * 22 + 120, 600))
-                    : Math.max(250, Math.min(data.length * 6 + 100, 500))
-              }
-            />
-          </div>
-        </Card>
-      ))}
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 };
