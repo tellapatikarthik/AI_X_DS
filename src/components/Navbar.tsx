@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Home, MessageSquare, Wrench, Database } from "lucide-react";
+import { BarChart3, Home, MessageSquare, PieChart, Database, Zap } from "lucide-react";
 
 const Navbar = () => {
   const location = useLocation();
@@ -49,7 +49,7 @@ const Navbar = () => {
                 className="gap-2"
                 size="sm"
               >
-                <Wrench className="h-4 w-4" />
+                <PieChart className="h-4 w-4" />
                 <span className="hidden sm:inline">DataTool</span>
               </Button>
             </Link>
@@ -62,6 +62,17 @@ const Navbar = () => {
               >
                 <Database className="h-4 w-4" />
                 <span className="hidden sm:inline">Query Tool</span>
+              </Button>
+            </Link>
+
+            <Link to="/quicker-query">
+              <Button 
+                variant={isActive("/quicker-query") ? "default" : "ghost"}
+                className="gap-2"
+                size="sm"
+              >
+                <Zap className="h-4 w-4" />
+                <span className="hidden sm:inline">Quick Query</span>
               </Button>
             </Link>
           </div>

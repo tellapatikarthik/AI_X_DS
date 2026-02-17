@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { MessageSquare, Wrench, Database, BarChart3 } from "lucide-react";
+import { MessageSquare, PieChart, Database, BarChart3, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Index = () => {
@@ -32,7 +32,7 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
             {/* Prompting Mode */}
             <Link to="/prompting" className="block group">
               <Card className="p-6 h-full shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/50 group-hover:-translate-y-2 cursor-pointer">
@@ -43,7 +43,7 @@ const Index = () => {
                   <div className="space-y-2">
                     <h2 className="text-xl font-bold">Prompting Mode</h2>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Upload your file and describe what visualizations you need. 
+                      Upload your file and describe what visualizations you need.
                       AI will suggest and create charts for you.
                     </p>
                   </div>
@@ -61,12 +61,12 @@ const Index = () => {
               <Card className="p-6 h-full shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-accent/50 group-hover:-translate-y-2 cursor-pointer">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg">
-                    <Wrench className="h-8 w-8 text-accent-foreground" />
+                    <PieChart className="h-8 w-8 text-accent-foreground" />
                   </div>
                   <div className="space-y-2">
                     <h2 className="text-xl font-bold">DataTool Mode</h2>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Upload your file and manually build visualizations using our 
+                      Upload your file and manually build visualizations using our
                       Power BI-like interface.
                     </p>
                   </div>
@@ -79,14 +79,9 @@ const Index = () => {
               </Card>
             </Link>
 
-            {/* Data Query Tool - NEW */}
+            {/* Data Query Tool */}
             <Link to="/query-tool" className="block group">
-              <Card className="p-6 h-full shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/50 group-hover:-translate-y-2 cursor-pointer relative overflow-hidden">
-                <div className="absolute top-2 right-2">
-                  <span className="px-2 py-0.5 text-xs font-semibold bg-primary text-primary-foreground rounded-full">
-                    NEW
-                  </span>
-                </div>
+              <Card className="p-6 h-full shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/50 group-hover:-translate-y-2 cursor-pointer">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
                     <Database className="h-8 w-8 text-primary-foreground" />
@@ -94,8 +89,31 @@ const Index = () => {
                   <div className="space-y-2">
                     <h2 className="text-xl font-bold">Data Query Tool</h2>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      No-code querying with concepts. Filter, aggregate, group, and 
+                      No-code querying with concepts. Filter, aggregate, group, and
                       analyze data without writing SQL.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <span className="inline-flex items-center gap-2 text-primary font-semibold group-hover:gap-3 transition-all text-sm">
+                      Get Started →
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            </Link>
+
+            {/* Quicker Query */}
+            <Link to="/quicker-query" className="block group">
+              <Card className="p-6 h-full shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/50 group-hover:-translate-y-2 cursor-pointer">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary via-accent to-primary flex items-center justify-center shadow-lg">
+                    <Zap className="h-8 w-8 text-primary-foreground" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold">Quicker Query</h2>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Upload datasets and just type what you need in plain English.
+                      AI returns the exact table you asked for.
                     </p>
                   </div>
                   <div className="pt-2">

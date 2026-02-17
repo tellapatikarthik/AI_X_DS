@@ -202,8 +202,30 @@ export const ChartRenderer = ({
         );
 
       case "pie":
-      case "donut":
-        const pieData = chartData.map((item) => ({
+      case "donut": {
+        let pieSource = chartData;
+        const uniqueSlices = new Set(chartData.map(d => String(d[xKey]))).size;
+
+        // High cardinality: sum each numeric column for a meaningful pie chart
+        if (uniqueSlices > 10) {
+          const allKeys = Object.keys(data[0] || {});
+          const numericKeys = allKeys.filter(k =>
+            data.some(r => typeof r[k] === "number" && !isNaN(r[k]))
+          );
+          if (numericKeys.length >= 2) {
+            pieSource = numericKeys.map(k => ({
+              [xKey]: `Sum of ${k}`,
+              [yKey]: parseFloat(data.reduce((s, r) => s + (Number(r[k]) || 0), 0).toFixed(2)),
+            }));
+          } else {
+            // Keep top 10 by value for readability
+            pieSource = [...chartData]
+              .sort((a, b) => (Number(b[yKey]) || 0) - (Number(a[yKey]) || 0))
+              .slice(0, 10);
+          }
+        }
+
+        const pieData = pieSource.map((item) => ({
           name: item[xKey],
           value: Number(item[yKey]) || 0,
         }));
@@ -241,6 +263,7 @@ export const ChartRenderer = ({
             </PieChart>
           </ResponsiveContainer>
         );
+      }
 
       case "scatter":
         return (
