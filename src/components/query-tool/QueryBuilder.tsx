@@ -1256,27 +1256,195 @@ const QueryBuilder = ({
       <CardContent className="space-y-6">
         {renderConceptUI()}
 
+        {/* Composable SQL Clauses - available for non-modify concepts */}
+        {concept !== "modify" && (
+          <div className="space-y-4">
+            {/* WHERE clause - if not already shown by filter/logical concept */}
+            {concept !== "filter" && concept !== "logical" && (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 font-semibold">
+                    <Badge variant="outline" className="text-xs">WHERE</Badge>
+                    Filter Conditions
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    {conditions.length > 1 && (
+                      <div className="flex items-center gap-1 border rounded-lg p-0.5">
+                        <Button
+                          variant={conditionLogic === "and" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setConditionLogic("and")}
+                        >AND</Button>
+                        <Button
+                          variant={conditionLogic === "or" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setConditionLogic("or")}
+                        >OR</Button>
+                      </div>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addCondition} className="gap-1 h-7 text-xs">
+                      <Plus className="h-3 w-3" /> Add Filter
+                    </Button>
+                  </div>
+                </div>
+                {conditions.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No filters applied (optional)</p>
+                )}
+                {conditions.map((cond, index) => (
+                  <div key={cond.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded flex-wrap">
+                    {index > 0 && (
+                      <Badge variant={conditionLogic === "or" ? "default" : "secondary"} className="text-xs mr-1">
+                        {conditionLogic.toUpperCase()}
+                      </Badge>
+                    )}
+                    <Select value={cond.column} onValueChange={(v) => updateCondition(cond.id, { column: v })}>
+                      <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {allColumns.map((col) => (
+                          <SelectItem key={col.name} value={col.name}>{col.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={cond.operator} onValueChange={(v) => updateCondition(cond.id, { operator: v as ConditionOperator })}>
+                      <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {getOperatorsForColumn(cond.column).map((op) => (
+                          <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!["is_empty", "is_not_empty"].includes(cond.operator) && (
+                      <Input value={cond.value} onChange={(e) => updateCondition(cond.id, { value: e.target.value })} placeholder="Value" className="w-[120px] h-8 text-xs" />
+                    )}
+                    {cond.operator === "between" && (
+                      <>
+                        <span className="text-xs text-muted-foreground">and</span>
+                        <Input value={cond.value2 || ""} onChange={(e) => updateCondition(cond.id, { value2: e.target.value })} placeholder="Value 2" className="w-[120px] h-8 text-xs" />
+                      </>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeCondition(cond.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* GROUP BY - if not already shown */}
+            {concept !== "group" && concept !== "aggregate" && (
+              <div className="border rounded-lg p-4 space-y-3">
+                <Label className="flex items-center gap-2 font-semibold">
+                  <Badge variant="outline" className="text-xs">GROUP BY</Badge>
+                  Group Data
+                </Label>
+                <Select value={groupByColumns[0] || "__none__"} onValueChange={(v) => setGroupByColumns(v === "__none__" ? [] : [v])}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="No grouping" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No grouping (optional)</SelectItem>
+                    {allColumns.map((col) => (
+                      <SelectItem key={col.name} value={col.name}>{col.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {groupByColumns.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Aggregations</Label>
+                      <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => {
+                        setAggregations([...aggregations, { column: numericColumns[0]?.name || allColumns[0]?.name || "", function: "sum" as AggregationFunction }]);
+                      }}>
+                        <Plus className="h-3 w-3 mr-1" /> Add
+                      </Button>
+                    </div>
+                    {aggregations.map((agg, index) => (
+                      <div key={index} className="flex items-center gap-2 bg-muted/50 p-2 rounded">
+                        <Select value={agg.function} onValueChange={(v) => { const u = [...aggregations]; u[index] = { ...agg, function: v as AggregationFunction }; setAggregations(u); }}>
+                          <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{AGGREGATIONS.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <span className="text-xs text-muted-foreground">of</span>
+                        <Select value={agg.column} onValueChange={(v) => { const u = [...aggregations]; u[index] = { ...agg, column: v }; setAggregations(u); }}>
+                          <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{(agg.function === "count" || agg.function === "count_distinct" ? allColumns : numericColumns.length > 0 ? numericColumns : allColumns).map((col) => <SelectItem key={col.name} value={col.name}>{col.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAggregations(aggregations.filter((_, i) => i !== index))}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ORDER BY - if not already shown */}
+            {concept !== "sort" && (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 font-semibold">
+                    <Badge variant="outline" className="text-xs">ORDER BY</Badge>
+                    Sort Results
+                  </Label>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSortConfig([...sortConfig, { column: allColumns[0]?.name || "", direction: "asc" }])}>
+                    <Plus className="h-3 w-3 mr-1" /> Add Sort
+                  </Button>
+                </div>
+                {sortConfig.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No sorting applied (optional)</p>
+                )}
+                {sortConfig.map((sort, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Select value={sort.column} onValueChange={(v) => { const u = [...sortConfig]; u[index] = { ...sort, column: v }; setSortConfig(u); }}>
+                      <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{allColumns.map((col) => <SelectItem key={col.name} value={col.name}>{col.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Button variant={sort.direction === "asc" ? "default" : "outline"} size="sm" className="h-7 text-xs gap-1" onClick={() => { const u = [...sortConfig]; u[index] = { ...sort, direction: "asc" }; setSortConfig(u); }}>
+                      <ArrowUp className="h-3 w-3" /> ASC
+                    </Button>
+                    <Button variant={sort.direction === "desc" ? "default" : "outline"} size="sm" className="h-7 text-xs gap-1" onClick={() => { const u = [...sortConfig]; u[index] = { ...sort, direction: "desc" }; setSortConfig(u); }}>
+                      <ArrowDown className="h-3 w-3" /> DESC
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSortConfig(sortConfig.filter((_, i) => i !== index))}><Trash2 className="h-3 w-3" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* LIMIT - if not already shown */}
+            {concept !== "limit" && (
+              <div className="border rounded-lg p-4 space-y-2">
+                <Label className="flex items-center gap-2 font-semibold">
+                  <Badge variant="outline" className="text-xs">LIMIT</Badge>
+                  Limit Rows
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input type="number" value={limitRows || ""} onChange={(e) => setLimitRows(e.target.value ? parseInt(e.target.value) : null)} placeholder="No limit (optional)" className="w-[180px] h-8 text-xs" min={1} />
+                  <div className="flex gap-1">
+                    {[10, 50, 100].map((n) => (
+                      <Button key={n} variant={limitRows === n ? "default" : "outline"} size="sm" className="h-7 text-xs" onClick={() => setLimitRows(n)}>
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Data Preview */}
         {previewData && (
           <div className="border rounded-lg overflow-hidden">
             <div className="bg-muted px-3 py-2 flex justify-between items-center">
               <span className="text-sm font-medium">Data Preview (first 5 rows)</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPreviewData(null)}
-              >
-                Close
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setPreviewData(null)}>Close</Button>
             </div>
             <ScrollArea className="h-[200px]">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr>
                     {Object.keys(previewData[0] || {}).map((col) => (
-                      <th key={col} className="px-3 py-2 text-left font-medium">
-                        {col}
-                      </th>
+                      <th key={col} className="px-3 py-2 text-left font-medium">{col}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1284,9 +1452,7 @@ const QueryBuilder = ({
                   {previewData.map((row, i) => (
                     <tr key={i} className="border-t">
                       {Object.values(row).map((val, j) => (
-                        <td key={j} className="px-3 py-2">
-                          {String(val)}
-                        </td>
+                        <td key={j} className="px-3 py-2">{String(val)}</td>
                       ))}
                     </tr>
                   ))}

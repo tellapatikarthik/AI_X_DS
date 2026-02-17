@@ -110,7 +110,15 @@ export const VisualizationBuilder = ({
           </div>
 
           <div>
-            <Label htmlFor="xAxis">X-Axis / Category</Label>
+            <Label htmlFor="xAxis">
+              {["pie", "donut"].includes(chartType) ? "Category (Slices)" :
+               chartType === "radar" ? "Angle Axis" :
+               chartType === "treemap" ? "Category" :
+               chartType === "funnel" ? "Stage" :
+               chartType === "gauge" ? "Label" :
+               chartType === "worldmap" ? "Country / Region" :
+               "X-Axis (Categories)"}
+            </Label>
             <Select value={xAxis} onValueChange={setXAxis}>
               <SelectTrigger className="mt-2">
                 <SelectValue placeholder="Select column" />
@@ -126,7 +134,15 @@ export const VisualizationBuilder = ({
           </div>
 
           <div>
-            <Label htmlFor="yAxis">Y-Axis / Value</Label>
+            <Label htmlFor="yAxis">
+              {["pie", "donut"].includes(chartType) ? "Value (Size)" :
+               chartType === "radar" ? "Radius Value" :
+               chartType === "treemap" ? "Size Value" :
+               chartType === "funnel" ? "Value" :
+               chartType === "gauge" ? "Value (%)" :
+               chartType === "worldmap" ? "Value" :
+               "Y-Axis (Values)"}
+            </Label>
             <Select value={yAxis} onValueChange={setYAxis}>
               <SelectTrigger className="mt-2">
                 <SelectValue placeholder="Select column" />
