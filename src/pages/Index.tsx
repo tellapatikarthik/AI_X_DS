@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { MessageSquare, PieChart, Database, BarChart3, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, PieChart, Database, Zap, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Index = () => {
@@ -7,13 +8,19 @@ const Index = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-8 w-8 text-primary" />
+            <img src="/AIXDS.png" alt="AI X DS" className="h-8 w-8" />
             <span className="font-bold text-2xl bg-gradient-primary bg-clip-text text-transparent">
               StudentAnalytics
             </span>
           </div>
+          <Link to="/settings">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Settings
+            </Button>
+          </Link>
         </div>
       </header>
 

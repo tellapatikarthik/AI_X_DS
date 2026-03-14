@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChartRenderer } from "@/components/charts/ChartRenderer";
 import { ChartType, getChartLabel, ChartIcon } from "@/components/charts/ChartIcon";
 import { Plus, Save, X } from "lucide-react";
@@ -26,6 +27,7 @@ export interface VisualizationConfig {
   title: string;
   xAxis: string;
   yAxis: string;
+  yAxisColumns?: string[];
   description?: string;
 }
 
@@ -38,44 +40,48 @@ export const VisualizationBuilder = ({
 }: VisualizationBuilderProps) => {
   const [title, setTitle] = useState(`New ${getChartLabel(chartType)}`);
   const [xAxis, setXAxis] = useState(() => columns[0]?.name || "");
-  const [yAxis, setYAxis] = useState(() => {
+  const [yAxisColumns, setYAxisColumns] = useState<string[]>(() => {
     const x = columns[0]?.name || "";
     const sample = data.slice(0, 30);
     const isNumeric = (name: string) =>
       sample.some((row) => typeof row?.[name] === "number" && !Number.isNaN(row[name]));
 
-    return (
-      columns.find((c) => c.name !== x && isNumeric(c.name))?.name ||
+    const firstNumeric = columns.find((c) => c.name !== x && isNumeric(c.name))?.name ||
       columns.find((c) => isNumeric(c.name))?.name ||
       columns[1]?.name ||
-      x
-    );
+      x;
+    return [firstNumeric];
   });
 
   useEffect(() => {
     setTitle(`New ${getChartLabel(chartType)}`);
-
     const x = columns[0]?.name || "";
     const sample = data.slice(0, 30);
     const isNumeric = (name: string) =>
       sample.some((row) => typeof row?.[name] === "number" && !Number.isNaN(row[name]));
 
-    const y =
-      columns.find((c) => c.name !== x && isNumeric(c.name))?.name ||
+    const y = columns.find((c) => c.name !== x && isNumeric(c.name))?.name ||
       columns.find((c) => isNumeric(c.name))?.name ||
       columns[1]?.name ||
       x;
 
     setXAxis(x);
-    setYAxis(y);
+    setYAxisColumns([y]);
   }, [chartType]);
+
+  const toggleYColumn = (colName: string) => {
+    setYAxisColumns(prev => 
+      prev.includes(colName) ? prev.filter(c => c !== colName) : [...prev, colName]
+    );
+  };
 
   const handleSave = () => {
     onSave({
       chartType,
       title,
       xAxis,
-      yAxis,
+      yAxis: yAxisColumns[0] || "",
+      yAxisColumns,
     });
   };
 
@@ -110,15 +116,7 @@ export const VisualizationBuilder = ({
           </div>
 
           <div>
-            <Label htmlFor="xAxis">
-              {["pie", "donut"].includes(chartType) ? "Category (Slices)" :
-               chartType === "radar" ? "Angle Axis" :
-               chartType === "treemap" ? "Category" :
-               chartType === "funnel" ? "Stage" :
-               chartType === "gauge" ? "Label" :
-               chartType === "worldmap" ? "Country / Region" :
-               "X-Axis (Categories)"}
-            </Label>
+            <Label htmlFor="xAxis">X-Axis (Categories)</Label>
             <Select value={xAxis} onValueChange={setXAxis}>
               <SelectTrigger className="mt-2">
                 <SelectValue placeholder="Select column" />
@@ -134,31 +132,28 @@ export const VisualizationBuilder = ({
           </div>
 
           <div>
-            <Label htmlFor="yAxis">
-              {["pie", "donut"].includes(chartType) ? "Value (Size)" :
-               chartType === "radar" ? "Radius Value" :
-               chartType === "treemap" ? "Size Value" :
-               chartType === "funnel" ? "Value" :
-               chartType === "gauge" ? "Value (%)" :
-               chartType === "worldmap" ? "Value" :
-               "Y-Axis (Values)"}
-            </Label>
-            <Select value={yAxis} onValueChange={setYAxis}>
-              <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Select column" />
-              </SelectTrigger>
-              <SelectContent>
-                {columns.map((col) => (
-                  <SelectItem key={col.name} value={col.name}>
+            <Label>Y-Axis (Values) - Select Multiple</Label>
+            <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+              {columns.filter(c => c.name !== xAxis).map((col) => (
+                <div key={col.name} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={col.name}
+                    checked={yAxisColumns.includes(col.name)}
+                    onCheckedChange={() => toggleYColumn(col.name)}
+                  />
+                  <label htmlFor={col.name} className="text-sm cursor-pointer">
                     {col.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </label>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Selected: {yAxisColumns.length} column(s)
+            </p>
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} variant="hero" className="flex-1">
+            <Button onClick={handleSave} variant="hero" className="flex-1" disabled={yAxisColumns.length === 0}>
               <Save className="h-4 w-4 mr-2" />
               Add to Dashboard
             </Button>
@@ -174,7 +169,8 @@ export const VisualizationBuilder = ({
             type={chartType}
             data={data}
             xAxis={xAxis}
-            yAxis={yAxis}
+            yAxis={yAxisColumns[0]}
+            yAxisColumns={yAxisColumns}
             height={280}
           />
         </div>

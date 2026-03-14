@@ -15,7 +15,7 @@ import {
 import {
   BarChart,
   Bar,
-  LineChart,
+  LineChart as RechartsLineChart,
   Line,
   PieChart,
   Pie,
@@ -35,9 +35,11 @@ import {
   Lightbulb,
   TrendingUp,
   Calculator,
+  LineChart,
 } from "lucide-react";
 import { QueryResult, QueryConfig, DatasetInfo } from "@/types/queryTool";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export interface NamedResult {
   label: string;
@@ -209,6 +211,7 @@ const SingleResultTable = ({ result, label }: { result: QueryResult; label?: str
 
 const ResultsViewer = ({ result, results, config, datasets }: ResultsViewerProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Normalize to array of named results
   const allResults: NamedResult[] = useMemo(() => {
@@ -246,6 +249,13 @@ const ResultsViewer = ({ result, results, config, datasets }: ResultsViewerProps
     toast({ title: "Query saved", description: `Saved as "${queryName}"` });
   };
 
+  const visualizeData = (res: QueryResult) => {
+    sessionStorage.setItem('analyticsData', JSON.stringify(res.data));
+    sessionStorage.setItem('analyticsColumns', JSON.stringify(res.columns));
+    sessionStorage.setItem('analyticsMode', 'datatool');
+    navigate('/workspace');
+  };
+
   return (
     <div className="space-y-6">
       {/* Insights */}
@@ -280,9 +290,14 @@ const ResultsViewer = ({ result, results, config, datasets }: ResultsViewerProps
             <Save className="h-4 w-4 mr-1" /> Save Query
           </Button>
           {allResults.length === 1 && (
-            <Button variant="outline" size="sm" onClick={() => exportToCSV(allResults[0].result, allResults[0].label)}>
-              <Download className="h-4 w-4 mr-1" /> Export CSV
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => exportToCSV(allResults[0].result, allResults[0].label)}>
+                <Download className="h-4 w-4 mr-1" /> Download
+              </Button>
+              <Button variant="default" size="sm" onClick={() => visualizeData(allResults[0].result)}>
+                <LineChart className="h-4 w-4 mr-1" /> Visualize
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -293,9 +308,14 @@ const ResultsViewer = ({ result, results, config, datasets }: ResultsViewerProps
           {allResults.length > 1 && (
             <div className="flex items-center justify-between">
               <h4 className="font-medium text-sm">{nr.label}</h4>
-              <Button variant="ghost" size="sm" onClick={() => exportToCSV(nr.result, nr.label)}>
-                <Download className="h-3.5 w-3.5 mr-1" /> CSV
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => exportToCSV(nr.result, nr.label)}>
+                  <Download className="h-3.5 w-3.5 mr-1" /> Download
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => visualizeData(nr.result)}>
+                  <LineChart className="h-3.5 w-3.5 mr-1" /> Visualize
+                </Button>
+              </div>
             </div>
           )}
           <SingleResultTable result={nr.result} label={allResults.length > 1 ? undefined : undefined} />

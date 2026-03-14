@@ -7,8 +7,10 @@ import { VisualizationBuilder, VisualizationConfig } from "@/components/analytic
 import { DashboardCanvas } from "@/components/analytics/DashboardCanvas";
 import { AIVisualizationInput } from "@/components/analytics/AIVisualizationInput";
 import { SuggestionCards } from "@/components/analytics/SuggestionCards";
+import { WorkspaceChatbot } from "@/components/analytics/WorkspaceChatbot";
+import { DataFilter } from "@/components/analytics/DataFilter";
 import { ChartType } from "@/components/charts/ChartIcon";
-import { Save, Loader2, ArrowLeft, BarChart3, Sparkles, Wrench, FileSpreadsheet } from "lucide-react";
+import { Save, Loader2, ArrowLeft, Sparkles, Wrench, FileSpreadsheet, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,6 +20,13 @@ interface Suggestion {
   xAxis?: string;
   yAxis?: string;
   description: string;
+}
+
+interface FilterRule {
+  id: string;
+  column: string;
+  operator: string;
+  value: string;
 }
 
 const AnalyticsWorkspace = () => {
@@ -33,6 +42,8 @@ const AnalyticsWorkspace = () => {
   const [showBuilder, setShowBuilder] = useState(false);
   const [visualizations, setVisualizations] = useState<(VisualizationConfig & { id: string })[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const [filteredData, setFilteredData] = useState<any[]>([]);
 
   useEffect(() => {
     // Load data from sessionStorage
@@ -49,6 +60,7 @@ const AnalyticsWorkspace = () => {
 
     try {
       setParsedData(JSON.parse(storedData));
+      setFilteredData(JSON.parse(storedData));
       setColumns(JSON.parse(storedColumns));
       setMode(storedMode as 'prompting' | 'datatool' || 'datatool');
       setPrompt(storedPrompt || '');
@@ -64,6 +76,22 @@ const AnalyticsWorkspace = () => {
     
     setLoading(false);
   }, [navigate]);
+
+  const applyFilters = (selectedValues: Record<string, string[]>) => {
+    setFilters(selectedValues);
+    if (Object.keys(selectedValues).length === 0) {
+      setFilteredData(parsedData);
+      return;
+    }
+
+    const filtered = parsedData.filter(row => {
+      return Object.entries(selectedValues).every(([column, values]) => {
+        const rowValue = String(row[column] ?? "");
+        return values.includes(rowValue);
+      });
+    });
+    setFilteredData(filtered);
+  };
 
   const isNumericColumn = (col: string, dataSample: any[]) => {
     const sample = dataSample.slice(0, 30);
@@ -92,7 +120,12 @@ const AnalyticsWorkspace = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        // Fallback: create basic visualizations
+        createFallbackVisualizations(cols, data);
+        return;
+      }
 
       if (response?.suggestions) {
         setSuggestions(response.suggestions);
@@ -121,13 +154,37 @@ const AnalyticsWorkspace = () => {
         });
         
         toast.success("AI generated visualizations based on your request!");
+      } else {
+        createFallbackVisualizations(cols, data);
       }
     } catch (error: any) {
       console.error("AI suggestion error:", error);
-      toast.error("Failed to generate AI suggestions");
+      createFallbackVisualizations(cols, data);
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const createFallbackVisualizations = (cols: string[], data: any[]) => {
+    const defaults = getDefaultAxes(cols, data);
+    const charts: Array<{ type: ChartType; title: string }> = [
+      { type: "clustered-column", title: "Column Chart" },
+      { type: "line", title: "Line Chart" },
+      { type: "pie", title: "Pie Chart" },
+    ];
+
+    charts.forEach(chart => {
+      const newViz: VisualizationConfig & { id: string } = {
+        chartType: chart.type,
+        title: chart.title,
+        xAxis: defaults.xAxis,
+        yAxis: defaults.yAxis,
+        id: crypto.randomUUID(),
+      };
+      setVisualizations((prev) => [...prev, newViz]);
+    });
+    
+    toast.success("Created basic visualizations for your data!");
   };
 
   const handleChartSelect = (type: ChartType) => {
@@ -149,6 +206,10 @@ const AnalyticsWorkspace = () => {
   const handleRemoveVisualization = (id: string) => {
     setVisualizations((prev) => prev.filter((v) => v.id !== id));
     toast.success("Visualization removed");
+  };
+
+  const handleVisualizationRequest = async (userPrompt: string) => {
+    await generateAISuggestions(columns, parsedData, userPrompt);
   };
 
   const handleSuggestions = (newSuggestions: Suggestion[]) => {
@@ -194,7 +255,7 @@ const AnalyticsWorkspace = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link to="/" className="flex items-center gap-2">
-                <BarChart3 className="h-7 w-7 text-primary" />
+                <img src="/AIXDS.png" alt="AI X DS" className="h-7 w-7" />
                 <span className="font-bold text-xl bg-gradient-primary bg-clip-text text-transparent">
                   StudentAnalytics
                 </span>
@@ -218,12 +279,22 @@ const AnalyticsWorkspace = () => {
                 <FileSpreadsheet className="h-4 w-4" />
                 <span>{parsedData.length} rows • {columns.length} columns</span>
               </div>
+              <DataFilter
+                columns={columns}
+                data={parsedData}
+                onApplyFilter={applyFilters}
+                activeFilters={filters}
+              />
               <Link to="/">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <ArrowLeft className="h-4 w-4" />
                   New File
                 </Button>
               </Link>
+              <Button variant="outline" size="sm" className="gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+              </Button>
               <Button variant="hero" size="sm" className="gap-2">
                 <Save className="h-4 w-4" />
                 Save Dashboard
@@ -261,7 +332,7 @@ const AnalyticsWorkspace = () => {
           {columns.length > 0 && !aiLoading && (
             <AIVisualizationInput
               columns={columns.map(name => ({ name, type: 'text' }))}
-              sampleData={parsedData}
+              sampleData={filteredData}
               onSuggestions={handleSuggestions}
             />
           )}
@@ -278,7 +349,7 @@ const AnalyticsWorkspace = () => {
             <VisualizationBuilder
               chartType={selectedChartType}
               columns={columns.map(name => ({ name, type: 'text' }))}
-              data={parsedData}
+              data={filteredData}
               onSave={handleVisualizationSave}
               onCancel={() => {
                 setShowBuilder(false);
@@ -291,12 +362,19 @@ const AnalyticsWorkspace = () => {
           {!showBuilder && (
             <DashboardCanvas
               visualizations={visualizations}
-              data={parsedData}
+              data={filteredData}
               onRemove={handleRemoveVisualization}
             />
           )}
         </div>
       </div>
+
+      {/* Chatbot */}
+      <WorkspaceChatbot
+        columns={columns}
+        data={filteredData}
+        onVisualizationRequest={handleVisualizationRequest}
+      />
     </div>
   );
 };

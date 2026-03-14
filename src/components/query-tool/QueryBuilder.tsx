@@ -212,7 +212,7 @@ const QueryBuilder = ({
     rows: Record<string, any>[],
     column: string
   ): number => {
-    if (values.length === 0) return 0;
+    if (fn !== "count" && fn !== "count_distinct" && values.length === 0) return 0;
     switch (fn) {
       case "sum":
         return values.reduce((a, b) => a + b, 0);
@@ -1478,3 +1478,4 @@ const QueryBuilder = ({
 };
 
 export default QueryBuilder;
+

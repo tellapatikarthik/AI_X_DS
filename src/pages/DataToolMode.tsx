@@ -4,10 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileSpreadsheet, Wrench, Loader2, ArrowLeft, BarChart3 } from "lucide-react";
+import { Upload, FileSpreadsheet, Wrench, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { applyColumnAliases, parseDatasetFile, type ParsedDataset } from "@/lib/datasetParser";
+import { DatasetHistoryPanel, saveDatasetToHistory, loadDatasetFromHistory } from "@/components/analytics/DatasetHistory";
 
 const DataToolMode = () => {
   const navigate = useNavigate();
@@ -38,12 +39,23 @@ const DataToolMode = () => {
       const parsed = await parseDatasetFile(file);
       setDataset(parsed);
       setColumnAliases({});
+      saveDatasetToHistory(file.name, parsed.data, parsed.columns, "datatool");
       toast.success(`File loaded: ${parsed.data.length} rows, ${parsed.columns.length} columns`);
     } catch (error: any) {
       console.error("File parse error:", error);
       setDataset(null);
       setColumnAliases({});
       toast.error(error?.message || "Failed to parse file");
+    }
+  };
+
+  const handleSelectDataset = (id: string) => {
+    const loaded = loadDatasetFromHistory(id);
+    if (loaded) {
+      setDataset({ data: loaded.data, columns: loaded.columns });
+      setColumnAliases({});
+      setFile(new File([], "Previous Dataset"));
+      toast.success("Dataset loaded from history");
     }
   };
 
@@ -73,7 +85,7 @@ const DataToolMode = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <BarChart3 className="h-8 w-8 text-primary" />
+              <img src="/AIXDS.png" alt="AI X DS" className="h-8 w-8" />
               <span className="font-bold text-2xl bg-gradient-primary bg-clip-text text-transparent">
                 StudentAnalytics
               </span>
@@ -91,6 +103,7 @@ const DataToolMode = () => {
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-3xl mx-auto space-y-8">
+          <DatasetHistoryPanel onSelectDataset={handleSelectDataset} currentMode="datatool" />
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent">
               <Wrench className="h-4 w-4" />

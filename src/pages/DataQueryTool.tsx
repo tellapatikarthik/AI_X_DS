@@ -10,6 +10,7 @@ import ResultsViewer, { NamedResult } from "@/components/query-tool/ResultsViewe
 import SavedQueries from "@/components/query-tool/SavedQueries";
 import { ParsedDataset } from "@/lib/datasetParser";
 import { QueryConfig, QueryResult, DatasetInfo, CONCEPTS } from "@/types/queryTool";
+import { saveDatasetToHistory } from "@/components/analytics/DatasetHistory";
 
 const DataQueryTool = () => {
   const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
@@ -41,6 +42,7 @@ const DataQueryTool = () => {
 
   const handleDatasetAdd = (dataset: DatasetInfo) => {
     setDatasets((prev) => [...prev, dataset]);
+    saveDatasetToHistory(dataset.name, dataset.data, dataset.columns.map(c => c.name), "query-tool");
   };
 
   const handleDatasetRemove = (id: string) => {
@@ -149,7 +151,7 @@ const DataQueryTool = () => {
               <Link to="/">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <ArrowLeft className="h-4 w-4" />
-                  Back
+                  <Link to="/data-upload">Back</Link>
                 </Button>
               </Link>
               <div className="flex items-center gap-2">

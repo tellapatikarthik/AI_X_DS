@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,13 @@ import {
   Search,
   BarChart3,
   X,
+  Download,
+  LineChart,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { parseDatasetFile, type ParsedDataset } from "@/lib/datasetParser";
+import { parseNaturalQuery } from "@/lib/queryParser";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
 interface UploadedDataset {
   id: string;
@@ -37,11 +39,29 @@ interface QueryResultData {
 }
 
 const QuickerQuery = () => {
+  const navigate = useNavigate();
   const [datasets, setDatasets] = useState<UploadedDataset[]>([]);
   const [selectedDatasetIds, setSelectedDatasetIds] = useState<string[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<QueryResultData[]>([]);
+
+  // Load datasets from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('quickerQueryDatasets');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setDatasets(parsed);
+      setSelectedDatasetIds(parsed.map((d: UploadedDataset) => d.id));
+    }
+  }, []);
+
+  // Save datasets to localStorage whenever they change
+  useEffect(() => {
+    if (datasets.length > 0) {
+      localStorage.setItem('quickerQueryDatasets', JSON.stringify(datasets));
+    }
+  }, [datasets]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -74,7 +94,13 @@ const QuickerQuery = () => {
   };
 
   const removeDataset = (id: string) => {
-    setDatasets((prev) => prev.filter((d) => d.id !== id));
+    setDatasets((prev) => {
+      const updated = prev.filter((d) => d.id !== id);
+      if (updated.length === 0) {
+        localStorage.removeItem('quickerQueryDatasets');
+      }
+      return updated;
+    });
     setSelectedDatasetIds((prev) => prev.filter((sid) => sid !== id));
   };
 
@@ -101,35 +127,13 @@ const QuickerQuery = () => {
 
     setLoading(true);
     try {
-      // Build schema for AI
-      const schema: Record<string, { columns: { name: string; type: string }[]; sampleRow: any }> = {};
-      const tableNames: string[] = [];
-      selectedDatasets.forEach((ds) => {
-        schema[ds.name] = {
-          columns: ds.columns,
-          sampleRow: ds.data[0] || {},
-        };
-        tableNames.push(ds.name);
-      });
-
-      const { data: aiResult, error } = await supabase.functions.invoke("quick-query", {
-        body: { schema, prompt: prompt.trim(), tableNames },
-      });
-
-      if (error) throw error;
-      if (aiResult?.error) throw new Error(aiResult.error);
-
-      // Execute the query config client-side
-      const config = aiResult;
-      const targetDs = selectedDatasets.find(
-        (ds) =>
-          ds.name.toLowerCase() === config.selectedTable?.toLowerCase() ||
-          ds.name.toLowerCase().includes(config.selectedTable?.toLowerCase() || "") ||
-          config.selectedTable?.toLowerCase().includes(ds.name.toLowerCase().replace(/\.\w+$/, ""))
-      ) || selectedDatasets[0];
-
-      if (!targetDs) throw new Error("Could not find the target dataset");
-
+      const targetDs = selectedDatasets[0];
+      const allColumns = targetDs.columns.map(c => c.name);
+      
+      // Parse query locally
+      const config = parseNaturalQuery(prompt.trim(), allColumns);
+      console.log("Parsed Query Config:", config);
+      
       let resultData = [...targetDs.data];
 
       // Apply conditions
@@ -146,10 +150,15 @@ const QuickerQuery = () => {
               case "greater_equal": return Number(val) >= Number(cv);
               case "less_equal": return Number(val) <= Number(cv);
               case "contains": return String(val).toLowerCase().includes(String(cv).toLowerCase());
+              case "not_contains": return !String(val).toLowerCase().includes(String(cv).toLowerCase());
               case "starts_with": return String(val).toLowerCase().startsWith(String(cv).toLowerCase());
               case "ends_with": return String(val).toLowerCase().endsWith(String(cv).toLowerCase());
               case "is_empty": return val === null || val === undefined || val === "";
               case "is_not_empty": return val !== null && val !== undefined && val !== "";
+              case "between": {
+                const [min, max] = String(cv).split(',').map(Number);
+                return Number(val) >= min && Number(val) <= max;
+              }
               case "in_list": return String(cv).split(",").map((v: string) => v.trim().toLowerCase()).includes(String(val).toLowerCase());
               default: return true;
             }
@@ -176,46 +185,91 @@ const QuickerQuery = () => {
       // Apply aggregations with groupBy
       if (config.aggregations?.length > 0) {
         if (config.groupBy?.length > 0) {
+          // Group by columns
           const groups = new Map<string, any[]>();
           resultData.forEach((row) => {
-            const key = config.groupBy.map((col: string) => row[col]).join("|||");
+            const key = config.groupBy.map((col: string) => String(row[col] ?? '')).join("|||");
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key)!.push(row);
           });
+          
           resultData = Array.from(groups.entries()).map(([key, rows]) => {
             const grouped: any = {};
             config.groupBy.forEach((col: string, i: number) => {
               grouped[col] = key.split("|||")[i];
             });
+            
             config.aggregations.forEach((agg: any) => {
-              const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
               const label = `${agg.function}_${agg.column}`;
               switch (agg.function) {
-                case "sum": grouped[label] = vals.reduce((a, b) => a + b, 0); break;
-                case "average": grouped[label] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0; break;
-                case "count": grouped[label] = rows.length; break;
-                case "count_distinct": grouped[label] = new Set(rows.map((r) => r[agg.column])).size; break;
-                case "min": grouped[label] = vals.length ? Math.min(...vals) : 0; break;
-                case "max": grouped[label] = vals.length ? Math.max(...vals) : 0; break;
-                default: grouped[label] = 0;
+                case "sum": {
+                  const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                  grouped[label] = vals.reduce((a, b) => a + b, 0);
+                  break;
+                }
+                case "average": {
+                  const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                  grouped[label] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+                  break;
+                }
+                case "count":
+                  grouped[label] = rows.length;
+                  break;
+                case "count_distinct":
+                  grouped[label] = new Set(rows.map((r) => r[agg.column])).size;
+                  break;
+                case "min": {
+                  const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                  grouped[label] = vals.length ? Math.min(...vals) : 0;
+                  break;
+                }
+                case "max": {
+                  const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                  grouped[label] = vals.length ? Math.max(...vals) : 0;
+                  break;
+                }
+                default:
+                  grouped[label] = 0;
               }
             });
             return grouped;
           });
         } else {
+          // No group by - aggregate entire dataset
           const rows = resultData;
           const grouped: any = {};
+          
           config.aggregations.forEach((agg: any) => {
-            const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
             const label = `${agg.function}_${agg.column}`;
             switch (agg.function) {
-              case "sum": grouped[label] = vals.reduce((a, b) => a + b, 0); break;
-              case "average": grouped[label] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0; break;
-              case "count": grouped[label] = rows.length; break;
-              case "count_distinct": grouped[label] = new Set(rows.map((r) => r[agg.column])).size; break;
-              case "min": grouped[label] = vals.length ? Math.min(...vals) : 0; break;
-              case "max": grouped[label] = vals.length ? Math.max(...vals) : 0; break;
-              default: grouped[label] = 0;
+              case "sum": {
+                const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                grouped[label] = vals.reduce((a, b) => a + b, 0);
+                break;
+              }
+              case "average": {
+                const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                grouped[label] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+                break;
+              }
+              case "count":
+                grouped[label] = rows.length;
+                break;
+              case "count_distinct":
+                grouped[label] = new Set(rows.map((r) => r[agg.column])).size;
+                break;
+              case "min": {
+                const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                grouped[label] = vals.length ? Math.min(...vals) : 0;
+                break;
+              }
+              case "max": {
+                const vals = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
+                grouped[label] = vals.length ? Math.max(...vals) : 0;
+                break;
+              }
+              default:
+                grouped[label] = 0;
             }
           });
           resultData = [grouped];
@@ -262,6 +316,29 @@ const QuickerQuery = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const downloadCSV = (data: Record<string, any>[], columns: string[], filename: string) => {
+    const csv = [
+      columns.join(','),
+      ...data.map(row => columns.map(col => JSON.stringify(row[col] ?? '')).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Downloaded successfully!');
+  };
+
+  const visualizeData = (data: Record<string, any>[], columns: string[]) => {
+    sessionStorage.setItem('analyticsData', JSON.stringify(data));
+    sessionStorage.setItem('analyticsColumns', JSON.stringify(columns));
+    sessionStorage.setItem('analyticsMode', 'datatool');
+    navigate('/workspace');
   };
 
   return (
@@ -408,6 +485,24 @@ const QuickerQuery = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{res.data.length} rows</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => downloadCSV(res.data, res.columns, res.label)}
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => visualizeData(res.data, res.columns)}
+                    >
+                      <LineChart className="h-4 w-4" />
+                      Visualize
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

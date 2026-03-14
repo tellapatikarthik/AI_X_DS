@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Home, MessageSquare, PieChart, Database, Zap } from "lucide-react";
+import { Home, MessageSquare, PieChart, Database, Zap } from "lucide-react";
 
 const Navbar = () => {
   const location = useLocation();
@@ -13,7 +13,7 @@ const Navbar = () => {
         <div className="flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary shadow-md">
-              <BarChart3 className="h-6 w-6 text-primary-foreground" />
+              <img src="/AIXDS.png" alt="AI X DS" className="h-6 w-6" />
             </div>
             <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
               StudentAnalytics
